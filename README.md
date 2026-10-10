@@ -14,7 +14,7 @@ La contabilidad fiscal y los impuestos siguen en i-Money; BX es para la operaci�
 | Parte | Qué es |
 |---|---|
 | `server/` | API en Node.js (sin framework) con MySQL. Aquí viven todas las reglas y los permisos. |
-| `web/` | Pantallas en React. *Siguiente etapa.* |
+| `web/` | Pantallas en React (Vite). En producción el servidor las sirve ya compiladas. |
 
 Decisiones importantes:
 
@@ -75,9 +75,23 @@ Necesitas **Node.js 22 o más nuevo** y **MySQL 8**.
    npm start
    ```
 
-3. Comprueba que funciona: abre <http://localhost:3000/api/auth/yo>. Debe decir que tu sesión terminó (todavía no entras): eso significa que la API está viva.
+3. Compila las pantallas y dile al servidor dónde están:
 
-Las pantallas llegan en la siguiente etapa; mientras, la API ya se puede usar y probar.
+   ```bash
+   cd ../web
+   npm install
+   npm run build             # crea web/dist
+   ```
+
+   En `server/.env` quita el `#` de la línea `CARPETA_WEB=../web/dist` y reinicia el servidor (`npm start` dentro de `server/`).
+
+4. Abre <http://localhost:3000> y entra con el administrador que creaste.
+
+Para que otras computadoras de la red local entren, usa la IP de esta computadora (por ejemplo `http://192.168.1.50:3000`) y permite el puerto 3000 en el firewall.
+
+### Mientras se programa
+
+Con el servidor corriendo (`npm start` en `server/`), en otra terminal: `cd web && npm run dev` y abre <http://localhost:5173>. Los cambios en las pantallas se ven al instante.
 
 ## Pruebas
 

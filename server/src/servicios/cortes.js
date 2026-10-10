@@ -1,6 +1,6 @@
 // Corte diario: arqueo por moneda, sobrantes/faltantes, envío a matriz y cierre del día.
 import { reglas } from '../contabilidad/reglas.js';
-import { registrar, leerInventario, ultimoCorte, bloquearCajas } from '../contabilidad/libro.js';
+import { registrar, leerInventario, ultimoCorte, bloquearCajas, cancelar } from '../contabilidad/libro.js';
 import { cajaConAcceso, exigir } from '../auth/permisos.js';
 import { conflicto, noValido, noEncontrado } from '../lib/errores.js';
 import { MONEDAS, costoSalida, aPesos } from '../lib/dinero.js';
@@ -70,7 +70,7 @@ export async function hacerCorte(t, usuario, cajaId, d, ip) {
       const prom = inv.cantidad > 0 ? inv.costo / inv.cantidad : 0;
       costo = dif < 0 ? -costoSalida(Math.min(-dif, inv.cantidad), inv.cantidad, inv.costo) : Math.round(dif * prom);
     }
-    await registrar(t, { ...base, tipo: 'ajuste_corte', concepto: dif > 0 ? 'Sobrante en corte' : 'Faltante en corte', datos: { moneda: m, diferencia: dif } },
+    await registrar(t, { ...base, tipo: 'ajuste_corte', concepto: dif > 0 ? 'Sobrante en corte' : 'Faltante en corte', datos: { moneda: m, diferencia: dif, del_corte: true } },
       reglas.ajusteCorte({ cajaId: caja.id, moneda: m, diferencia: dif, costo }));
   }
   // 2) Envío a matriz.
@@ -79,7 +79,7 @@ export async function hacerCorte(t, usuario, cajaId, d, ip) {
     if (!q) continue;
     let costo = 0;
     if (m !== 'MXN') { const inv = await leerInventario(t, caja.id, m); costo = costoSalida(Math.min(q, inv.cantidad), inv.cantidad, inv.costo); }
-    await registrar(t, { ...base, tipo: 'traspaso', cajaDestinoId: matriz.id, concepto: 'Envío a matriz en corte', datos: { moneda: m, cantidad: q } },
+    await registrar(t, { ...base, tipo: 'traspaso', cajaDestinoId: matriz.id, concepto: 'Envío a matriz en corte', datos: { moneda: m, cantidad: q, del_corte: true } },
       reglas.traspaso({ origenId: caja.id, destinoId: matriz.id, moneda: m, cantidad: q, costo }));
   }
   // 3) Cierre.
@@ -102,6 +102,15 @@ export async function reabrir(t, usuario, corteId, motivo, ip) {
   if (String(c.fecha).slice(0, 10) !== uc) throw conflicto('Solo se puede reabrir el último corte de la caja.');
   if (!motivo || !String(motivo).trim()) throw noValido('Escribe el motivo para reabrir el día.');
   await t.q("UPDATE cortes SET estado = 'reabierto', reabierto_por = ?, reabierto_en = ?, motivo_reapertura = ? WHERE id = ?", [usuario.id, marca(), String(motivo).trim(), c.id]);
+  // Se deshacen los sobrantes/faltantes y envíos a matriz de ese corte, con la misma fecha del día reabierto.
+  // Así, al volver a hacer el corte, el arqueo parte de cero.
+  const fecha = String(c.fecha).slice(0, 10);
+  const delCorte = await t.q(
+    `SELECT id FROM asientos WHERE caja_id = ? AND fecha_operacion = ? AND cancela_a IS NULL AND cancelado_por IS NULL
+       AND tipo IN ('ajuste_corte','traspaso') AND datos LIKE ? ORDER BY id DESC`,
+    [c.caja_id, fecha, '%"del_corte":true%'],
+  );
+  for (const a of delCorte) await cancelar(t, a.id, { usuarioId: usuario.id, motivo: `Reapertura del corte: ${String(motivo).trim()}`, ip, fecha });
   await bitacora(t, { usuarioId: usuario.id, accion: 'reabrir_corte', entidad: 'corte', entidadId: c.id, detalle: { motivo }, ip });
 }
 

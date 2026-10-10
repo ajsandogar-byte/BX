@@ -105,12 +105,12 @@ export async function leerAsiento(t, id, bloquear = false) {
 }
 
 /** Cancela una operación con un asiento contrario fechado en el día de operación actual. */
-export async function cancelar(t, asientoId, { usuarioId, motivo, ip }) {
+export async function cancelar(t, asientoId, { usuarioId, motivo, ip, fecha: fechaForzada }) {
   const a = await leerAsiento(t, asientoId, true);
   if (a.cancela_a) throw conflicto('Esta operación ya es una cancelación.');
   if (a.cancelado_por) throw conflicto('Esta operación ya estaba cancelada.');
   const cajas = [...new Set([a.caja_id, a.caja_destino_id, ...(a.datos.inventario || []).map((x) => x.caja_id)].filter(Boolean))];
-  const fecha = await fechaParaCajas(t, cajas);
+  const fecha = fechaForzada || (await fechaParaCajas(t, cajas));
   await bloquearCajas(t, cajas);
   const contrario = invertir({
     partidas: a.partidas.map((x) => ({ cuenta_id: x.cuenta_id, cuenta: { codigo: x.codigo }, moneda: x.moneda, monto: x.monto })),

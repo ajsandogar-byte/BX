@@ -19,7 +19,12 @@ Sistema interno de una casa de cambios (matriz + 14 sucursales): saldos de clien
 - `npm run migrar`, `npm run crear-admin -- --usuario x --nombre "X"`, `npm start`.
 - Migraciones nuevas: archivo `server/db/migraciones/NNN_descripcion.sql`, nunca editar una ya aplicada.
 
+## Pantallas (`web/`)
+
+- React 19 + Vite, sin librerías extra. Rutas por hash (`#/cajas`), secciones por rol en `App.jsx`.
+- `api.js` manda `X-BX: 1` y convierte errores; `useDatos(ruta)` para cargar. Los montos se mandan como texto tal cual los escribe el usuario; el servidor los convierte.
+- Estilos en `estilos.css` (tokens del prototipo, modo oscuro automático). El prototipo original está en `docs/prototipo.html`.
+
 ## Pendiente
 
-- `web/`: pantallas en React (empezar por Cajas y Clientes, con el prototipo como referencia).
 - Importación de estados de cuenta de proveedores internos (tabla `edocta_lineas` ya existe), asignación a clientes y "No identificados" con `reglas.noIdentificado`.

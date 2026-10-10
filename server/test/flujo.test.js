@@ -142,7 +142,13 @@ test('corte con faltante y envío a matriz; el día queda cerrado', async () => 
   // El cajero no puede reabrir; el supervisor sí, con motivo.
   assert.equal((await cajero.post(`/api/cortes/${cortes[0].id}/reabrir`, { motivo: 'error' })).status, 403);
   assert.equal((await supervisor.post(`/api/cortes/${cortes[0].id}/reabrir`, {})).status, 400);
+  const antesSuc = (await supervisor.get('/api/cajas')).data.find((c) => c.id === sucursalId).existencias;
   assert.equal((await supervisor.post(`/api/cortes/${cortes[0].id}/reabrir`, { motivo: 'Revisar faltante' })).status, 200);
+  // Al reabrir regresan el faltante y lo enviado a la matriz.
+  const despuesSuc = (await supervisor.get('/api/cajas')).data.find((c) => c.id === sucursalId).existencias;
+  assert.equal(despuesSuc.MXN.cantidad, antesSuc.MXN.cantidad + 10 + 30000);
+  assert.equal(despuesSuc.USD.cantidad, antesSuc.USD.cantidad + 600);
+  assert.equal((await admin.get('/api/verificar-libro')).data.cuadra, true);
 });
 
 test('cancelar en lugar de borrar: queda registro y el saldo regresa', async () => {

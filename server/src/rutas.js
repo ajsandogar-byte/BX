@@ -179,7 +179,7 @@ export function crearRutas() {
     return db.tx(async (t) => {
       const a = await leerAsiento(t, Number(params.id));
       await exigirSobreAsiento(t, usuario, a);
-      if (a.tipo === 'ajuste_corte' || (a.tipo === 'traspaso' && a.concepto === 'Envío a matriz en corte')) {
+      if (a.tipo === 'ajuste_corte' || a.datos?.del_corte) {
         throw noValido('Esta operación es parte de un corte. Para corregirla, reabre el día.');
       }
       if (a.datos?.linea_id) throw noValido('Esta operación viene de un estado de cuenta. Desasígnala desde ahí.');
