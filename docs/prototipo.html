@@ -1,0 +1,1670 @@
+<title>Banco de Clientes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: libro mayor — barra superior con pestañas, resumen arriba, tablas de saldos debajo, captura en un diálogo */
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --sunk:#e8ece7; --line:#d4dbd3;
+  --fg:#17221c; --muted:#5d6b62; --accent:#0f6b4f; --accent-fg:#ffffff; --accent-soft:#d8ece3;
+  --pos:#167a3e; --neg:#b3261e; --neg-soft:#f8dedb; --warn:#8a5a00; --warn-soft:#f6ead2;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101613; --surface:#171f1b; --sunk:#1e2823; --line:#2c3a33;
+  --fg:#e5ece7; --muted:#97a69d; --accent:#4cc79a; --accent-fg:#06281c; --accent-soft:#18392d;
+  --pos:#5fd38b; --neg:#ff8a80; --neg-soft:#3d1d1a; --warn:#e6b450; --warn-soft:#3a2f17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101613; --surface:#171f1b; --sunk:#1e2823; --line:#2c3a33;
+  --fg:#e5ece7; --muted:#97a69d; --accent:#4cc79a; --accent-fg:#06281c; --accent-soft:#18392d;
+  --pos:#5fd38b; --neg:#ff8a80; --neg-soft:#3d1d1a; --warn:#e6b450; --warn-soft:#3a2f17; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:-.01em;margin-right:auto}
+.brand small{display:block;font-family:var(--f-body);font-weight:500;font-size:12px;color:var(--muted);letter-spacing:.02em}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:8px}
+nav.tabs button{background:none;border:0;padding:8px 12px;border-radius:6px;color:var(--muted);font:600 14px var(--f-body);cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+nav.tabs .count{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--warn);font-size:11px;padding:1px 6px;border-radius:99px}
+button{font-family:var(--f-body)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.danger{color:var(--neg)}
+.btn.danger.armed{background:var(--neg);border-color:var(--neg);color:var(--surface)}
+.btn.warn{color:var(--warn)}
+.btn.sm{padding:4px 10px;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:20px 48px;display:grid;gap:20px}
+h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0;text-wrap:balance}
+h3{font-size:14px;font-weight:600;margin:0}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.notice{border:1px solid var(--line);background:var(--sunk);padding:10px 14px;border-radius:var(--r);font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.notice span{flex:1;min-width:200px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:grid;gap:4px;align-content:start}
+.kpi .v{font-family:var(--f-mono);font-size:21px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.attn .v{color:var(--warn)}
+.kpi.click{cursor:pointer}.kpi.click:hover{background:var(--sunk)}
+.seg.s7{grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
+.seg.s7 label{border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.scopebar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.scopebar .hint{flex:1;padding-bottom:10px}
+.pill.ent{background:var(--accent-soft);color:var(--accent)}
+.pill.sal{background:var(--neg-soft);color:var(--neg)}
+.pill.gas{background:var(--warn-soft);color:var(--warn)}
+.pill.uti{background:var(--fg);color:var(--bg)}
+.bars{display:grid;gap:8px;padding:12px 16px}
+.bar-r{display:grid;grid-template-columns:minmax(90px,140px) 1fr auto;gap:10px;align-items:center;font-size:13px}
+.bar-t{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.bar-t i{display:block;height:100%;background:var(--warn);border-radius:4px}
+.bar-r b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0;display:flex;flex-direction:column}
+.panel-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin-right:auto}
+.panel-b{padding:16px;display:grid;gap:14px}
+.tscroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+td{padding:9px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.d{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}
+td.desc{max-width:340px;min-width:180px}
+td.acts{white-space:nowrap;text-align:right}
+td.acts .btn+.btn{margin-left:6px}
+tr.group td{background:var(--sunk);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-block:6px}
+tr.sub td{font-weight:600;border-bottom:2px solid var(--line)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--sunk)}
+tbody tr.sel td{background:var(--accent-soft)}
+tr.dup td{opacity:.5}
+.nw{white-space:nowrap}
+.rolbadge{font-size:12px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:4px 10px;white-space:nowrap}
+.rolegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.rolegrid div{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:2px;font-size:13px;color:var(--muted)}
+.rolegrid b{color:var(--fg);font-size:14px}
+.sugg{position:absolute;top:100%;left:0;right:0;z-index:4;background:var(--surface);border:1px solid var(--line);border-radius:6px;margin-top:4px;box-shadow:0 6px 18px rgba(0,0,0,.12);display:grid;max-height:240px;overflow:auto}
+.sugg button{background:none;border:0;text-align:left;padding:8px 10px;font:500 14px var(--f-body);color:var(--fg);cursor:pointer}
+.sugg button:hover,.sugg button:focus-visible{background:var(--sunk)}
+.neg{color:var(--neg)} .pos{color:var(--pos)} .mut{color:var(--muted)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap;vertical-align:1px}
+.pill.dep{background:var(--accent-soft);color:var(--accent)}
+.pill.pago{background:var(--neg-soft);color:var(--neg)}
+.pill.aj{background:var(--sunk);color:var(--warn)}
+.pill.ini{background:var(--sunk);color:var(--fg)}
+.pill.mod{background:transparent;border:1px solid var(--line);color:var(--fg);font-family:var(--f-mono);font-weight:500}
+.pill.int{background:var(--fg);color:var(--bg)}
+.pill.ext{background:transparent;border:1px solid var(--line)}
+.pill.pend{background:var(--warn-soft);color:var(--warn)}
+.pill.noid{background:var(--neg-soft);color:var(--neg)}
+.pill.asig{background:var(--accent-soft);color:var(--accent)}
+.pill.ej{background:transparent;border:1px dashed var(--line)}
+.empty{padding:28px 16px;color:var(--muted);text-align:center;font-size:14px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font:600 13px var(--f-body);color:var(--muted);cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip b{font-family:var(--f-mono);font-weight:500;color:var(--fg)}
+.chip[aria-pressed="true"]{border-color:var(--fg);color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
+label.f{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted);align-content:start}
+input,select,textarea{font:400 15px var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-width:0}
+input[readonly],select:disabled{background:var(--sunk)}
+input.num{font-family:var(--f-mono);text-align:right}
+input[type=file]{padding:6px}
+.filters select,.filters input{width:auto;font-size:14px;padding:6px 8px}
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--surface);color:var(--fg);width:min(580px,calc(100vw - 32px));max-height:calc(100dvh - 32px)}
+dialog::backdrop{background:rgba(10,20,15,.45)}
+dialog form{display:grid;gap:14px;padding:20px}
+.dlg-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{display:flex;align-items:center;justify-content:center;text-align:center;padding:8px 4px;font-weight:600;font-size:14px;cursor:pointer;color:var(--muted);line-height:1.15}
+.seg input{position:absolute;opacity:0;pointer-events:none;width:1px}
+.seg label:has(input:checked){background:var(--accent);color:var(--accent-fg)}
+.seg label:has(input:disabled:not(:checked)){opacity:.35;cursor:default}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-2px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.preview{background:var(--sunk);border-radius:6px;padding:12px 14px;display:grid;gap:6px;font-size:14px}
+.preview div{display:flex;justify-content:space-between;gap:12px}
+.preview b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.linked{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:6px;padding:10px 12px;font-size:13px;display:grid;gap:2px}
+.actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.err{color:var(--neg);font-size:13px;min-height:1em}
+.hint{font-size:12px;color:var(--muted);font-weight:400}
+.hint.changed,.n.changed{color:var(--warn);font-weight:600}
+.hint button{background:none;border:0;padding:0;color:var(--accent);font:600 12px var(--f-body);cursor:pointer;text-decoration:underline}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;font-weight:500;z-index:20;max-width:calc(100vw - 32px)}
+.detail-meta{display:flex;gap:24px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.detail-meta div{display:grid}
+.detail-meta b{font-family:var(--f-mono);font-size:18px;font-weight:500;font-variant-numeric:tabular-nums}
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.sum{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:14px}
+.sum b{font-family:var(--f-mono);font-weight:500}
+@media (max-width:520px){th,td{padding-inline:10px}.kpi .v{font-size:18px}.seg label{font-size:13px}}
+@media (prefers-reduced-motion:no-preference){.btn,nav.tabs button,.chip{transition:background .12s,border-color .12s}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand">Banco de Clientes<small>Clientes y proveedores en MXN · Caja en MXN, USD, EUR, CAD y GBP</small></div>
+      <span class="rolbadge" id="rol-badge" hidden></span>
+      <button class="btn primary" id="btn-nuevo" type="button">+ Nuevo movimiento</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-v="dash" aria-selected="true">Resumen</button>
+      <button role="tab" data-v="caja" aria-selected="false">Cajas</button>
+      <button role="tab" data-v="ec" aria-selected="false">Estados de cuenta<span class="count" id="tab-pend" hidden></span></button>
+      <button role="tab" data-v="mov" aria-selected="false">Movimientos</button>
+      <button role="tab" data-v="cli" aria-selected="false">Clientes</button>
+      <button role="tab" data-v="prov" aria-selected="false">Proveedores</button>
+      <button role="tab" data-v="usr" aria-selected="false">Usuarios</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="notice" id="n-rol" hidden><span id="n-rol-t"></span></div>
+  <div class="notice" id="n-offline" hidden><span>No hay conexión con la base de datos en esta vista. Puedes probar el sistema, pero lo que captures no se guardará.</span></div>
+  <div class="notice" id="n-ejemplo" hidden><span>Hay datos de ejemplo cargados. Bórralos cuando empieces a capturar tus clientes reales.</span><button class="btn sm danger" id="btn-borrar-ej" type="button">Borrar datos de ejemplo</button></div>
+  <div class="notice" id="n-readonly" hidden><span>Tienes acceso de solo lectura. Pide al dueño permiso de Colaborador para capturar movimientos.</span></div>
+
+  <!-- RESUMEN -->
+  <section id="v-dash" class="view" style="display:grid;gap:20px">
+    <div class="kpis">
+      <div class="kpi click" id="k-caja-w" tabindex="0"><span class="eyebrow">Cajas (pesos)</span><span class="v" id="k-caja">—</span><span class="s" id="k-caja-s">Efectivo disponible</span></div>
+      <div class="kpi"><span class="eyebrow">Saldo de clientes</span><span class="v" id="k-cli">—</span><span class="s">Lo que les debemos</span></div>
+      <div class="kpi"><span class="eyebrow">Saldo en proveedores</span><span class="v" id="k-prov">—</span><span class="s" id="k-prov-s">Internos y externos</span></div>
+      <div class="kpi attn"><span class="eyebrow">No identificado</span><span class="v" id="k-noid">—</span><span class="s" id="k-pend">Sin pendientes</span></div>
+      <div class="kpi"><span class="eyebrow">Utilidad del mes</span><span class="v" id="k-mes">—</span><span class="s" id="k-mes-s"></span></div>
+      <div class="kpi"><span class="eyebrow">Utilidad acumulada</span><span class="v" id="k-tot">—</span><span class="s">Comisión cobrada − comisión pagada</span></div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>Clientes</h2><span class="hint">Toca uno para ver su estado de cuenta</span></div>
+        <div class="tscroll"><table><thead><tr><th>Cliente</th><th>Atiende</th><th class="n">% base</th><th class="n">Depositado mes</th><th class="n">Saldo</th></tr></thead><tbody id="t-dash-cli"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Proveedores</h2></div>
+        <div class="tscroll"><table><thead><tr><th>Proveedor</th><th class="n">% N/A</th><th class="n">% C/F</th><th class="n">No ident.</th><th class="n">Saldo</th></tr></thead><tbody id="t-dash-prov"></tbody></table></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Por administrador de cuenta</h2><span class="hint">Toca uno para ver sus movimientos</span></div>
+      <div class="tscroll"><table><thead><tr><th>Administrador</th><th class="n">Clientes</th><th class="n">Depositado mes</th><th class="n">Utilidad mes</th><th class="n">Utilidad total</th><th class="n">Saldo clientes</th></tr></thead><tbody id="t-dash-adm"></tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Últimos movimientos</h2><button class="btn sm" type="button" data-goto="mov">Ver todos</button></div>
+      <div class="tscroll"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cliente</th><th>Proveedor</th><th class="n">Monto</th><th class="n">Cliente</th><th class="n">Proveedor</th><th class="n">Utilidad</th></tr></thead><tbody id="t-dash-mov"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- CAJA CENTRAL -->
+  <section id="v-caja" class="view" hidden style="display:grid;gap:20px">
+    <div class="scopebar">
+      <label class="f" style="min-width:240px">Ver caja<select id="c-scope"></select></label>
+      <span class="hint" id="c-scope-h"></span>
+      <button class="btn" type="button" id="btn-corte">Hacer corte</button>
+    </div>
+    <div class="kpis" id="c-inv"></div>
+    <div class="kpis">
+      <div class="kpi"><span class="eyebrow">Entradas del mes</span><span class="v" id="c-ent">—</span><span class="s">En pesos equivalentes</span></div>
+      <div class="kpi"><span class="eyebrow">Salidas del mes</span><span class="v" id="c-sal">—</span><span class="s">Sin gastos, cambios ni traspasos</span></div>
+      <div class="kpi"><span class="eyebrow">Gastos del mes</span><span class="v" id="c-gas">—</span><span class="s">En pesos equivalentes</span></div>
+      <div class="kpi"><span class="eyebrow">Utilidad cambiaria del mes</span><span class="v" id="c-ucam">—</span><span class="s" id="c-ucam-s">Ventas contra costo promedio</span></div>
+      <div class="kpi"><span class="eyebrow">Utilidad neta del mes</span><span class="v" id="c-neta">—</span><span class="s" id="c-neta-s">Comisiones + cambiaria − gastos</span></div>
+      <div class="kpi attn"><span class="eyebrow">Comisiones por ingresar</span><span class="v" id="c-upi">—</span><span class="s">Generadas y aún no pasadas a caja</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Cajas y sucursales</h2>
+        <form class="filters" id="form-suc" novalidate><input type="text" id="suc-nombre" placeholder="Nombre de la sucursal" autocomplete="off" aria-label="Nombre de la sucursal"><button class="btn sm" type="submit">+ Sucursal</button></form>
+      </div>
+      <div class="tscroll"><table><thead><tr><th>Caja</th><th class="n">MXN</th><th class="n">USD</th><th class="n">EUR</th><th class="n">CAD</th><th class="n">GBP</th><th>Último corte</th><th>Estado</th><th></th></tr></thead><tbody id="t-cajas"></tbody></table></div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>Registrar en caja</h2></div>
+        <form class="panel-b" id="form-caja" novalidate>
+          <div class="seg s7" role="radiogroup" aria-label="Tipo de movimiento de caja">
+            <label><input type="radio" name="ctipo" id="c-t-cam" value="cambio" checked>Compra / venta</label>
+            <label><input type="radio" name="ctipo" id="c-t-ent" value="entrada">Entrada</label>
+            <label><input type="radio" name="ctipo" id="c-t-sal" value="salida">Salida</label>
+            <label><input type="radio" name="ctipo" id="c-t-gas" value="gasto">Gasto</label>
+            <label><input type="radio" name="ctipo" id="c-t-tra" value="traspaso">Traspaso</label>
+            <label><input type="radio" name="ctipo" id="c-t-uti" value="utilidad">Utilidad</label>
+            <label><input type="radio" name="ctipo" id="c-t-ini" value="inicial">Saldo inicial</label>
+          </div>
+          <p class="hint" id="c-help" style="margin:0"></p>
+          <div class="row">
+            <label class="f"><span id="c-caja-l">Caja</span><select id="c-caja"></select></label>
+            <label class="f" id="c-dest-w" hidden>Caja destino<select id="c-dest"></select></label>
+            <label class="f">Fecha de operación<input type="date" id="c-fecha"><span class="hint" id="c-fecha-h"></span></label>
+          </div>
+          <div class="row">
+            <label class="f" id="c-op-w">Operación<select id="c-op"><option value="compra">Compra (el cliente nos vende divisa)</option><option value="venta">Venta (le vendemos divisa)</option></select></label>
+            <label class="f">Moneda<select id="c-mon"></select></label>
+          </div>
+          <div class="row">
+            <label class="f"><span id="c-monto-l">Monto</span><input class="num" type="text" inputmode="decimal" id="c-monto" placeholder="0.00" autocomplete="off"><span class="hint" id="c-monto-h"></span></label>
+            <label class="f" id="c-tc-w"><span id="c-tc-l">Tipo de cambio</span><input class="num" type="text" inputmode="decimal" id="c-tc" placeholder="0.0000" autocomplete="off"><span class="hint" id="c-tc-h"></span></label>
+          </div>
+          <div class="row" id="c-cp-w">
+            <label class="f">Afecta el saldo de<select id="c-cp"><option value="">Nadie (solo caja)</option><option value="cliente">Un cliente</option><option value="proveedor">Un proveedor</option></select></label>
+            <label class="f" id="c-cli-w" hidden>Cliente<select id="c-cli"></select></label>
+            <label class="f" id="c-prov-w" hidden>Proveedor<select id="c-prov"></select></label>
+          </div>
+          <div class="row">
+            <label class="f" id="c-cat-w" hidden>Categoría del gasto<input type="text" id="c-cat" list="dl-cat" autocomplete="off" placeholder="Renta, nómina, luz…"></label>
+            <label class="f">Concepto<input type="text" id="c-concepto" autocomplete="off" placeholder="Descripción breve"></label>
+            <label class="f">Referencia<input type="text" id="c-ref" autocomplete="off" placeholder="Folio, recibo…"></label>
+          </div>
+          <datalist id="dl-cat"></datalist>
+          <div class="preview" id="c-prev"></div>
+          <div class="err" id="c-err"></div>
+          <div class="actions"><button class="btn primary" type="submit" id="c-save">Registrar</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Gastos del mes por categoría</h2></div>
+        <div class="bars" id="c-bars"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Movimientos de caja</h2>
+        <div class="filters">
+          <select id="cf-mon" aria-label="Moneda"><option value="">Todas las monedas</option></select>
+          <select id="cf-tipo" aria-label="Tipo"><option value="">Todos los tipos</option><option value="compra">Compras</option><option value="venta">Ventas</option><option value="entrada">Entradas</option><option value="salida">Salidas</option><option value="gasto">Gastos</option><option value="traspaso">Traspasos</option><option value="utilidad">Utilidades</option><option value="inicial">Saldo inicial</option><option value="ajuste">Ajustes de corte</option></select>
+          <input type="month" id="cf-mes" aria-label="Mes">
+        </div>
+      </div>
+      <div class="tscroll"><table><thead><tr><th>Fecha</th><th>Caja</th><th>Tipo</th><th>Concepto</th><th>Contraparte</th><th class="n">Entra</th><th class="n">Sale</th><th class="n">T.C.</th><th class="n">Utilidad</th><th class="n">Saldo</th><th></th></tr></thead><tbody id="t-caja"></tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Cortes</h2><span class="hint">Un corte cierra el día de esa caja: ya no se puede registrar ni borrar con esa fecha o antes.</span></div>
+      <div class="tscroll"><table><thead><tr><th>Fecha</th><th>Caja</th><th>Diferencias</th><th>Enviado a matriz</th><th>Nota</th><th></th></tr></thead><tbody id="t-cortes"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- Diálogo: corte -->
+  <dialog id="dlg-corte">
+    <form id="form-corte" method="dialog" novalidate>
+      <div class="dlg-h"><h2 id="k-title">Corte de caja</h2><button class="btn sm" type="button" data-close>Cerrar</button></div>
+      <div class="row">
+        <label class="f">Caja<select id="k-caja"></select></label>
+        <label class="f">Fecha del corte<input type="date" id="k-fecha"><span class="hint" id="k-fecha-h"></span></label>
+      </div>
+      <p class="hint" style="margin:0">Cuenta el efectivo y escribe lo que hay. Si no cuadra, la diferencia se registra como sobrante o faltante. En sucursales puedes mandar el efectivo a la matriz en el mismo paso.</p>
+      <div class="tscroll" style="border:1px solid var(--line);border-radius:6px"><table><thead><tr><th>Moneda</th><th class="n">Según sistema</th><th class="n">Contado</th><th class="n">Diferencia</th><th class="n" id="k-env-th">Enviar a matriz</th></tr></thead><tbody id="k-rows"></tbody></table></div>
+      <label class="f">Nota<input type="text" id="k-nota" autocomplete="off" placeholder="Opcional"></label>
+      <div class="err" id="k-err"></div>
+      <div class="actions"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit" id="k-save">Cerrar el día</button></div>
+    </form>
+  </dialog>
+
+  <!-- ESTADOS DE CUENTA -->
+  <section id="v-ec" class="view" hidden style="display:grid;gap:20px">
+    <div class="panel">
+      <div class="panel-h"><h2>Cargar estado de cuenta</h2><span class="hint">Excel (.xlsx, .xls) o CSV · solo proveedores internos</span></div>
+      <div class="panel-b">
+        <div class="row">
+          <label class="f">Proveedor interno<select id="ec-prov"></select></label>
+          <label class="f">Archivo<input type="file" id="ec-file" accept=".xlsx,.xls,.csv,.txt"></label>
+        </div>
+        <p class="hint" id="ec-noint" hidden>No tienes proveedores internos. En la pestaña Proveedores, edita uno y marca su tipo como Interno.</p>
+        <div id="ec-map" hidden style="display:grid;gap:14px">
+          <div class="sum" id="ec-file-info"></div>
+          <div>
+            <h3>¿Qué columna es cada dato?</h3>
+            <p class="hint" style="margin:4px 0 10px">Lo adiviné por los encabezados. Revísalo una vez; se guarda para este proveedor y la próxima vez ya sale solo. Usa Abono y Cargo si vienen en columnas separadas, o Monto si viene en una sola con signo.</p>
+            <div class="mapgrid" id="ec-mapgrid"></div>
+          </div>
+          <div class="tscroll" style="border:1px solid var(--line);border-radius:6px"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Referencia</th><th class="n">Abono</th><th class="n">Cargo</th><th class="n">Saldo</th><th></th></tr></thead><tbody id="ec-prev"></tbody></table></div>
+          <div class="sum" id="ec-sum"></div>
+          <div class="err" id="ec-err"></div>
+          <div class="actions"><button class="btn" type="button" id="ec-cancel">Cancelar</button><button class="btn primary" type="button" id="ec-import">Importar</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">
+        <h2>Movimientos de estados de cuenta</h2>
+        <div class="filters">
+          <select id="ec-ver" aria-label="Proveedor"><option value="">Todos los internos</option></select>
+          <input type="search" id="ec-q" placeholder="Buscar descripción o referencia" aria-label="Buscar" style="min-width:200px">
+        </div>
+      </div>
+      <div class="panel-b" style="padding-bottom:0"><div class="chips" id="ec-chips"></div></div>
+      <div class="tscroll"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Descripción</th><th>Referencia</th><th class="n">Abono</th><th class="n">Cargo</th><th>Estado</th><th></th></tr></thead><tbody id="t-ec"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- USUARIOS -->
+  <section id="v-usr" class="view" hidden style="display:grid;gap:20px">
+    <div class="panel">
+      <div class="panel-h"><h2>Usuarios y permisos</h2></div>
+      <div class="panel-b">
+        <div class="rolegrid">
+          <div><b>Administrador</b><span>Acceso a todo: cajas, clientes, proveedores, estados de cuenta y usuarios.</span></div>
+          <div><b>Administrador de cuentas</b><span>Clientes, proveedores, movimientos y estados de cuenta. No ve las cajas.</span></div>
+          <div><b>Supervisor de sucursales</b><span>Solo las cajas de sucursales: registra, traspasa, hace y reabre cortes. No ve la matriz.</span></div>
+          <div><b>Cajero</b><span>Solo su caja: la ve, registra movimientos y hace su corte.</span></div>
+        </div>
+        <form id="form-usr" class="row" novalidate style="align-items:end">
+          <label class="f" style="position:relative">Persona<input type="search" id="u-q" placeholder="Busca por nombre" autocomplete="off"><div class="sugg" id="u-sugg" hidden></div></label>
+          <label class="f">Rol<select id="u-rol"><option value="cajero">Cajero</option><option value="supervisor">Supervisor de sucursales</option><option value="cuentas">Administrador de cuentas</option><option value="admin">Administrador</option></select></label>
+          <label class="f" id="u-caja-w">Su caja<select id="u-caja"></select></label>
+          <div class="actions" style="justify-content:flex-start"><button class="btn primary" type="submit">Asignar</button></div>
+        </form>
+        <div class="err" id="u-err"></div>
+      </div>
+      <div class="tscroll"><table><thead><tr><th>Persona</th><th>Rol</th><th>Caja</th><th></th></tr></thead><tbody id="t-usr"></tbody></table></div>
+      <p class="hint" style="padding:12px 16px;margin:0">Para que alguien pueda entrar, también compártele esta página desde el botón de compartir: como <b>Colaborador</b> para cajeros, supervisores y administradores de cuentas, y como <b>Editor</b> para administradores (así pueden asignar roles).</p>
+    </div>
+  </section>
+
+  <!-- MOVIMIENTOS -->
+  <section id="v-mov" class="view" hidden>
+    <div class="panel">
+      <div class="panel-h">
+        <h2>Movimientos</h2>
+        <div class="filters">
+          <select id="f-cli" aria-label="Filtrar por cliente"><option value="">Todos los clientes</option></select>
+          <select id="f-adm" aria-label="Filtrar por administrador"><option value="">Todos los administradores</option></select>
+          <select id="f-prov" aria-label="Filtrar por proveedor"><option value="">Todos los proveedores</option></select>
+          <select id="f-tipo" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="deposito">Depósitos</option><option value="pago">Pagos</option><option value="ajuste">Ajustes</option><option value="inicial">Saldos iniciales</option><option value="noident">No identificados</option><option value="caja">Caja</option></select>
+          <input type="month" id="f-mes" aria-label="Mes">
+          <button class="btn sm" id="btn-csv" type="button">Exportar CSV</button>
+        </div>
+      </div>
+      <div class="tscroll"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cliente</th><th>Proveedor</th><th>Referencia</th><th class="n">Monto</th><th class="n">% Cli</th><th class="n">% Prov</th><th class="n">Cliente</th><th class="n">Proveedor</th><th class="n">Utilidad</th><th></th></tr></thead><tbody id="t-mov"></tbody>
+      <tfoot id="t-mov-foot"></tfoot></table></div>
+    </div>
+  </section>
+
+  <!-- CLIENTES -->
+  <section id="v-cli" class="view" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>Clientes</h2><select id="f-cli-adm" aria-label="Filtrar clientes por administrador" style="width:auto;font-size:14px;padding:6px 8px"><option value="">Todos los administradores</option></select><button class="btn sm" id="btn-add-cli" type="button">+ Cliente</button></div>
+        <div class="tscroll"><table><thead><tr><th>Cliente</th><th>Atiende</th><th class="n">% base</th><th class="n">Saldo</th><th></th></tr></thead><tbody id="t-cli"></tbody></table></div>
+      </div>
+      <div class="panel" id="d-cli"></div>
+    </div>
+  </section>
+
+  <!-- PROVEEDORES -->
+  <section id="v-prov" class="view" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>Proveedores</h2><button class="btn sm" id="btn-add-prov" type="button">+ Proveedor</button></div>
+        <div class="tscroll"><table><thead><tr><th>Proveedor</th><th class="n">% N/A</th><th class="n">% C/F</th><th class="n">Saldo</th><th></th></tr></thead><tbody id="t-prov"></tbody></table></div>
+      </div>
+      <div class="panel" id="d-prov"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Diálogo: movimiento -->
+<dialog id="dlg-mov">
+  <form id="form-mov" method="dialog" novalidate>
+    <div class="dlg-h"><h2 id="m-title">Nuevo movimiento</h2><button class="btn sm" type="button" data-close>Cerrar</button></div>
+    <div class="linked" id="m-linea" hidden></div>
+    <div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
+      <label><input type="radio" name="tipo" id="m-t-dep" value="deposito" checked>Depósito</label>
+      <label><input type="radio" name="tipo" id="m-t-pago" value="pago">Pago</label>
+      <label><input type="radio" name="tipo" id="m-t-aj" value="ajuste">Ajuste</label>
+      <label><input type="radio" name="tipo" id="m-t-ini" value="inicial">Saldo inicial</label>
+    </div>
+    <p class="hint" id="m-help" style="margin:0"></p>
+    <div class="row">
+      <label class="f">Fecha<input type="date" id="m-fecha" required></label>
+      <label class="f" id="m-mod-w">Modalidad<select id="m-mod"><option value="NA">N/A</option><option value="CF">C/F</option></select></label>
+      <label class="f" id="m-aplica-w" hidden>Aplicar a<select id="m-aplica"><option value="cliente">Cliente</option><option value="proveedor">Proveedor</option></select></label>
+    </div>
+    <div class="row">
+      <label class="f" id="m-cli-w">Cliente<select id="m-cli"></select></label>
+      <label class="f" id="m-prov-w">Proveedor<select id="m-prov"></select></label>
+    </div>
+    <div class="row">
+      <label class="f">Monto<input class="num" type="text" inputmode="decimal" id="m-monto" placeholder="0.00" autocomplete="off"></label>
+      <label class="f" id="m-pc-w">% al cliente en esta operación<input class="num" type="text" inputmode="decimal" id="m-pc"><span class="hint" id="m-pc-h"></span></label>
+      <label class="f" id="m-pp-w">% del proveedor en esta operación<input class="num" type="text" inputmode="decimal" id="m-pp"><span class="hint" id="m-pp-h"></span></label>
+    </div>
+    <div class="row">
+      <label class="f">Referencia<input type="text" id="m-ref" placeholder="Folio, rastreo, etc." autocomplete="off"></label>
+      <label class="f">Concepto<input type="text" id="m-concepto" placeholder="Opcional" autocomplete="off"></label>
+    </div>
+    <div class="preview" id="m-prev"></div>
+    <div class="err" id="m-err"></div>
+    <div class="actions"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit" id="m-save">Guardar movimiento</button></div>
+  </form>
+</dialog>
+
+<!-- Diálogo: cliente / proveedor -->
+<dialog id="dlg-ent">
+  <form id="form-ent" method="dialog" novalidate>
+    <div class="dlg-h"><h2 id="e-title">Cliente</h2><button class="btn sm" type="button" data-close>Cerrar</button></div>
+    <label class="f">Nombre<input type="text" id="e-nombre" autocomplete="off"></label>
+    <label class="f" id="e-tipo-w">Tipo de proveedor<select id="e-tipo"><option value="externo">Externo</option><option value="interno">Interno (cargamos su estado de cuenta)</option></select></label>
+    <label class="f" id="e-atiende-w">Lo atiende (administrador de cuenta)<input type="text" id="e-atiende" list="dl-admins" autocomplete="off" placeholder="Escribe o elige un nombre"></label>
+    <datalist id="dl-admins"></datalist>
+    <div class="row" id="e-cli-w">
+      <label class="f"><span>% base que le cobramos</span><input class="num" type="text" inputmode="decimal" id="e-com"></label>
+      <label class="f">Modalidad del cliente<select id="e-mod"><option value="NA">N/A</option><option value="CF">C/F</option></select></label>
+    </div>
+    <div class="row" id="e-prov-w">
+      <label class="f">% que nos cobra en N/A<input class="num" type="text" inputmode="decimal" id="e-na"></label>
+      <label class="f">% que nos cobra en C/F<input class="num" type="text" inputmode="decimal" id="e-cf"></label>
+    </div>
+    <div class="row" id="e-ini-w">
+      <label class="f">Saldo inicial (opcional)<input class="num" type="text" inputmode="decimal" id="e-ini" placeholder="0.00"><span class="hint" id="e-ini-h"></span></label>
+      <label class="f">Fecha del saldo inicial<input type="date" id="e-ini-f"></label>
+    </div>
+    <label class="f">Notas<textarea id="e-notas" rows="2"></textarea></label>
+    <p class="hint" id="e-hint" style="margin:0"></p>
+    <div class="err" id="e-err"></div>
+    <div class="actions"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit" id="e-save">Guardar</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  // ---------- Estado ----------
+  const S = { cli:new Map(), prov:new Map(), mov:new Map(), lin:new Map(), caja:new Map(), cajas:new Map(), cortes:new Map(), roles:new Map(), rol:null, miCaja:'', me:null, owner:false, rolesListos:false, prof:{}, selCli:null, selProv:null, canWrite:true, linea:null, ecFiltro:'pendiente', imp:null };
+  const K = { clientes:'cli', proveedores:'prov', movimientos:'mov', edocta:'lin', caja:'caja', cajas:'cajas', cortes:'cortes', roles:'roles' };
+  const $ = s => document.querySelector(s);
+  const money = new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'});
+  const fm = n => money.format(Math.round((n||0)*100)/100);
+  const pct = n => (n==null||!isFinite(n)) ? '—' : (Math.round(n*1000)/1000).toString() + '%';
+  const r2 = n => Math.round(n*100)/100;
+  const today = () => { const d=new Date(); return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+  const mesActual = () => today().slice(0,7);
+  const num = v => { const x = parseFloat(String(v??'').replace(/[,$\s]/g,'')); return isFinite(x) ? x : NaN; };
+  const MOD = {NA:'N/A', CF:'C/F'};
+  function h(tag, attrs, ...kids){
+    const el = document.createElement(tag);
+    for (const [k,v] of Object.entries(attrs||{})) {
+      if (v==null || v===false) continue;
+      if (k==='class') el.className=v; else if (k.startsWith('on')) el.addEventListener(k.slice(2),v); else el.setAttribute(k,v===true?'':v);
+    }
+    for (const c of kids.flat()) if (c!=null && c!==false) el.append(c.nodeType?c:document.createTextNode(String(c)));
+    return el;
+  }
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3000); }
+
+  // ---------- Almacenamiento (db compartida o memoria) ----------
+  let db = null;
+  const rid = () => Math.random().toString(36).slice(2,12);
+  const local = (col, fn) => { fn(S[K[col]]); render(); };
+  const store = {
+    async add(col, data){ if (db){ const ref = await db.collection(col).add(data); return ref.id; } const id='m'+rid(); local(col,m=>m.set(id,data)); return id; },
+    async set(col, id, data){ if (db) await db.collection(col).doc(id).set(data); else local(col,m=>m.set(id,data)); },
+    async upd(col, id, data){ if (db) await db.collection(col).doc(id).update(data); else local(col,m=>m.set(id,{...m.get(id),...data})); },
+    async del(col, id){ if (db) await db.collection(col).doc(id).delete(); else local(col,m=>m.delete(id)); },
+  };
+  function writeErr(e){
+    const code = e && e.code;
+    if (code==='invalid_argument') { S.canWrite=false; $('#n-readonly').hidden=false; return 'No tienes permiso para guardar en este sistema.'; }
+    if (code==='quota_exceeded') return 'Se llenó el espacio de la base de datos. Exporta y depura movimientos antiguos.';
+    return 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.';
+  }
+
+  // ---------- Helpers de dominio ----------
+  const provPct = (p,mod) => { if (!p) return undefined; const v=p['comision'+(mod||'NA')]; return v!=null? v : p.comision; };
+  const esInterno = p => p && p.tipo==='interno';
+  const byName = map => [...map.entries()].map(([id,v])=>({id,...v})).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
+  const nameOf = (map,id) => (map.get(id)||{}).nombre || '—';
+  const admins = () => [...new Set([...S.cli.values()].map(c=>c.atiende).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const sortedMovs = () => [...S.mov.entries()].map(([id,m])=>({id,...m})).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||'') || (b.creado||0)-(a.creado||0));
+  const lineState = l => ((l.estado==='asignado'||l.estado==='noident') && !S.mov.has(l.movId)) ? 'pendiente' : (l.estado||'pendiente');
+  const lineMonto = l => (l.abono||0) - (l.cargo||0);
+
+  function saldos(){
+    const c={}, p={}, cMes={}, pMes={}, noid={}; let util=0, utilMes=0, nPend=0, mPend=0; const mes=mesActual();
+    for (const m of S.mov.values()){
+      if (m.clienteId) c[m.clienteId]=(c[m.clienteId]||0)+(m.efCliente||0);
+      if (m.proveedorId) p[m.proveedorId]=(p[m.proveedorId]||0)+(m.efProveedor||0);
+      util += m.utilidad||0;
+      if (m.tipo==='noident') noid[m.proveedorId]=(noid[m.proveedorId]||0)+(m.efNoid||0);
+      if ((m.fecha||'').slice(0,7)===mes){
+        utilMes += m.utilidad||0;
+        if (m.tipo==='deposito'){ cMes[m.clienteId]=(cMes[m.clienteId]||0)+m.monto; pMes[m.proveedorId]=(pMes[m.proveedorId]||0)+m.monto; }
+      }
+    }
+    for (const l of S.lin.values()){
+      const st=lineState(l);
+      if (st==='pendiente'){ nPend++; mPend+=lineMonto(l); }
+    }
+    return {c,p,cMes,pMes,util,utilMes,noid,nPend,mPend};
+  }
+  function calcMov(f){
+    const monto = num(f.monto);
+    if (f.tipo==='deposito'){
+      const pc=num(f.pc), pp=num(f.pp);
+      return { efCliente:r2(monto*(1-pc/100)), efProveedor:r2(monto*(1-pp/100)), utilidad:r2(monto*(pc-pp)/100), pctCliente:pc, pctProveedor:pp };
+    }
+    if (f.tipo==='pago') return { efCliente:-r2(monto), efProveedor:-r2(monto), utilidad:0 };
+    return f.aplica==='cliente' ? { efCliente:r2(monto), efProveedor:0, utilidad:0 } : { efCliente:0, efProveedor:r2(monto), utilidad:0 };
+  }
+
+  // ---------- Render general ----------
+  const TIPOS = {deposito:['Depósito','dep'], pago:['Pago','pago'], ajuste:['Ajuste','aj'], inicial:['Saldo inicial','ini'], noident:['No identificado','noid'], caja:['Caja','ini']};
+  const tipoPill = t => h('span',{class:'pill '+((TIPOS[t]||[])[1]||'')},(TIPOS[t]||[t])[0]);
+  const modPill = m => MOD[m]? h('span',{class:'pill mod'},MOD[m]) : null;
+  const provPill = p => p? h('span',{class:'pill '+(esInterno(p)?'int':'ext')}, esInterno(p)?'Interno':'Externo') : null;
+  const ejPill = x => x&&x.ejemplo? h('span',{class:'pill ej'},'ejemplo') : null;
+  const nCell = (v, opts={}) => h('td',{class:'n '+(opts.sign? (v<0?'neg':v>0?'pos':'mut') : '')}, v===null?'—':fm(v));
+  const emptyRow = (cols,msg) => h('tr',{},h('td',{colspan:cols,class:'empty'},msg));
+  const cliName = m => m.tipo==='noident'? h('span',{class:'pill noid'},'No identificados') : (m.clienteId?nameOf(S.cli,m.clienteId):'—');
+  const admCell = c => h('td',{class:c.atiende?'':'mut'}, c.atiende||'Sin asignar');
+  const sp = (...xs) => xs.flatMap((x,i)=> x==null? [] : (i? [' ',x] : [x]));
+  const rowKey = (fn) => ({tabindex:'0', onclick:fn, onkeydown:e=>{ if(e.key==='Enter') fn(); }});
+
+  // ---------- Roles ----------
+  const ROLES = {
+    admin:{nombre:'Administrador', tabs:['dash','caja','ec','mov','cli','prov','usr']},
+    cuentas:{nombre:'Administrador de cuentas', tabs:['dash','ec','mov','cli','prov']},
+    supervisor:{nombre:'Supervisor de sucursales', tabs:['caja']},
+    cajero:{nombre:'Cajero', tabs:['caja']},
+  };
+  const puede = t => !!(S.rol && ROLES[S.rol] && ROLES[S.rol].tabs.includes(t));
+  const esAdmin = () => S.rol==='admin';
+  function allowedCajas(){
+    const ids=[MATRIZ, ...byName(S.cajas).map(c=>c.id)];
+    if (S.rol==='admin') return ids;
+    if (S.rol==='supervisor') return ids.filter(i=>i!==MATRIZ);
+    if (S.rol==='cajero') return ids.includes(S.miCaja)? [S.miCaja] : [];
+    return [];
+  }
+  function calcRol(){
+    if (!db) return;
+    if (S.owner) { S.rol='admin'; S.miCaja=''; return; }
+    if (!S.rolesListos) { S.rol=null; return; }
+    const r = S.me? S.roles.get(S.me) : null;
+    S.rol = r && ROLES[r.rol]? r.rol : 'ninguno'; S.miCaja = r? (r.cajaId||'') : '';
+  }
+  function applyRole(){
+    calcRol();
+    const ok = S.rol && ROLES[S.rol];
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.hidden=!puede(b.dataset.v));
+    $('#btn-nuevo').hidden = !S.canWrite || !puede('mov');
+    $('#k-caja-w').hidden = !puede('caja');
+    const nr=$('#n-rol'), badge=$('#rol-badge');
+    if (!ok){
+      document.querySelectorAll('.view').forEach(v=>v.hidden=true);
+      nr.hidden=false;
+      $('#n-rol-t').textContent = S.rol===null? 'Cargando tus permisos…' : 'Todavía no tienes un rol asignado. Pide a un administrador que te dé acceso en la pestaña Usuarios.';
+      badge.hidden=true; return;
+    }
+    const cajaTxt = S.rol==='cajero'? (S.miCaja && allowedCajas().length? ' · '+cajaName(S.miCaja) : ' · sin caja asignada') : '';
+    nr.hidden = !(S.rol==='cajero' && !allowedCajas().length);
+    $('#n-rol-t').textContent = 'Tu usuario es Cajero pero no tiene una caja asignada. Pide a un administrador que te asigne una.';
+    badge.hidden = !db; badge.textContent = ROLES[S.rol].nombre + cajaTxt;
+    const vis=[...document.querySelectorAll('.view')].find(v=>!v.hidden);
+    const cur = vis? vis.id.slice(2) : null;
+    if (!cur || !puede(cur)) go(ROLES[S.rol].tabs[0]);
+    // controles de caja según rol
+    $('#form-suc').hidden = !esAdmin();
+    $('#c-t-uti').closest('label').hidden = !esAdmin();
+    $('#c-neta').closest('.kpi').hidden = !esAdmin(); $('#c-upi').closest('.kpi').hidden = !esAdmin();
+    if (!esAdmin() && cTipo()==='utilidad'){ $('#c-t-cam').checked=true; }
+  }
+
+  function render(){
+    applyRole();
+    if (!S.rol || !ROLES[S.rol]) return;
+    const s = saldos();
+    const ej = [...S.cli.values(),...S.prov.values(),...S.mov.values()].some(x=>x.ejemplo);
+    $('#n-ejemplo').hidden = !ej || !S.canWrite;
+    $('#btn-nuevo').hidden = !S.canWrite || !puede('mov');
+    const clis = byName(S.cli), provs = byName(S.prov);
+    const totC = Object.values(s.c).reduce((a,b)=>a+b,0);
+    let totInt=0, totExt=0; for (const p of provs){ const v=s.p[p.id]||0; if (esInterno(p)) totInt+=v; else totExt+=v; }
+    const totNoid = Object.values(s.noid).reduce((a,b)=>a+b,0);
+    $('#k-cli').textContent=fm(totC); $('#k-prov').textContent=fm(totInt+totExt);
+    $('#k-prov-s').textContent='Internos '+fm(totInt)+' · Externos '+fm(totExt);
+    $('#k-noid').textContent=fm(totNoid);
+    $('#k-pend').textContent = s.nPend? (s.nPend+' por asignar en estados de cuenta ('+fm(s.mPend)+')') : 'Sin movimientos por asignar';
+    $('#k-mes').textContent=fm(s.utilMes); $('#k-tot').textContent=fm(s.util);
+    $('#k-mes-s').textContent = new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+    const tp=$('#tab-pend'); tp.hidden=!s.nPend; tp.textContent=s.nPend;
+
+    // clientes (resumen)
+    $('#t-dash-cli').replaceChildren(...(clis.length? clis.map(c=>{
+      const sal=s.c[c.id]||0;
+      return h('tr',{class:'click',...rowKey(()=>openCli(c.id))},
+        h('td',{},sp(c.nombre, modPill(c.modalidad), ejPill(c), sal<0?h('span',{class:'pill pago'},'Nos debe'):null)),
+        admCell(c), h('td',{class:'n mut'},pct(c.comision)), nCell(s.cMes[c.id]||0), nCell(sal,{sign:true}));
+    }) : [emptyRow(5,'Aún no hay clientes. Agrégalos en la pestaña Clientes.')]));
+    if (totNoid || [...S.mov.values()].some(m=>m.tipo==='noident'))
+      $('#t-dash-cli').append(h('tr',{class:'click',...rowKey(()=>{ S.ecFiltro='noident'; go('ec'); render(); })},
+        h('td',{},h('span',{class:'pill noid'},'No identificados')), h('td',{class:'mut'},'Por identificar'), h('td',{class:'n mut'},'—'), h('td',{class:'n mut'},'—'), h('td',{class:'n changed'},fm(totNoid))));
+
+    // proveedores (resumen) agrupados
+    const provRows=[];
+    for (const [label,list] of [['Internos',provs.filter(esInterno)],['Externos',provs.filter(p=>!esInterno(p))]]){
+      if (!list.length) continue;
+      provRows.push(h('tr',{class:'group'},h('td',{colspan:5},label)));
+      let st=0, sn=0;
+      for (const p of list){
+        const sal=s.p[p.id]||0, ni=s.noid[p.id]||0; st+=sal; sn+=ni;
+        provRows.push(h('tr',{class:'click',...rowKey(()=>openProv(p.id))},
+          h('td',{},sp(p.nombre, ejPill(p))), h('td',{class:'n mut'},pct(provPct(p,'NA'))), h('td',{class:'n mut'},pct(provPct(p,'CF'))),
+          esInterno(p)? h('td',{class:'n '+(ni?'changed':'mut')},fm(ni)) : h('td',{class:'n mut'},'—'), nCell(sal,{sign:true})));
+      }
+      provRows.push(h('tr',{class:'sub'},h('td',{colspan:3},'Total '+label.toLowerCase()), label==='Internos'? h('td',{class:'n'},fm(sn)) : h('td',{}), nCell(st,{sign:true})));
+    }
+    $('#t-dash-prov').replaceChildren(...(provRows.length? provRows : [emptyRow(5,'Aún no hay proveedores.')]));
+
+    // por administrador
+    const adm = {};
+    for (const c of clis){ const k=c.atiende||''; const a=adm[k]||(adm[k]={n:0,dep:0,um:0,ut:0,sal:0}); a.n++; a.dep+=s.cMes[c.id]||0; a.sal+=s.c[c.id]||0; }
+    const mes=mesActual();
+    for (const m of S.mov.values()){ const c=S.cli.get(m.clienteId); if(!c) continue; const a=adm[c.atiende||'']; if(!a) continue; a.ut+=m.utilidad||0; if((m.fecha||'').slice(0,7)===mes) a.um+=m.utilidad||0; }
+    const admKeys = Object.keys(adm).sort((a,b)=> (a===''?1:b===''?-1:a.localeCompare(b,'es')));
+    $('#t-dash-adm').replaceChildren(...(admKeys.length? admKeys.map(k=>{ const a=adm[k];
+      return h('tr',{class:'click',...rowKey(()=>verAdm(k))},
+        h('td',{class:k?'':'mut'},k||'Sin asignar'), h('td',{class:'n'},String(a.n)), nCell(a.dep), nCell(a.um,{sign:true}), nCell(a.ut,{sign:true}), nCell(a.sal,{sign:true}));
+    }) : [emptyRow(6,'Asigna un administrador a cada cliente desde la pestaña Clientes.')]));
+
+    const movs = sortedMovs();
+    $('#t-dash-mov').replaceChildren(...(movs.length? movs.slice(0,8).map(m=>h('tr',{},
+      h('td',{class:'d'},m.fecha), h('td',{},sp(tipoPill(m.tipo), modPill(m.modalidad))),
+      h('td',{},cliName(m)), h('td',{},m.proveedorId?nameOf(S.prov,m.proveedorId):'—'),
+      nCell(m.monto), nCell(m.efCliente,{sign:true}), nCell(m.efProveedor,{sign:true}), nCell(m.utilidad,{sign:true})
+    )) : [emptyRow(8,'Sin movimientos. Usa “Nuevo movimiento” para registrar el primero.')]));
+
+    renderMovs(movs);
+
+    // clientes (lista)
+    const fa = $('#f-cli-adm').value, clisF = clis.filter(c=>!fa || (fa==='__none'?!c.atiende:c.atiende===fa));
+    $('#t-cli').replaceChildren(...(clisF.length? clisF.map(c=>h('tr',{class:'click'+(S.selCli===c.id?' sel':''),...rowKey(()=>{S.selCli=c.id;render();})},
+      h('td',{},sp(c.nombre, modPill(c.modalidad), ejPill(c))), admCell(c), h('td',{class:'n mut'},pct(c.comision)), nCell(s.c[c.id]||0,{sign:true}),
+      h('td',{class:'acts'}, S.canWrite?h('button',{class:'btn sm',type:'button',onclick:e=>{e.stopPropagation();editEnt('clientes',c.id);}},'Editar'):null)
+    )) : [emptyRow(5, clis.length?'Ningún cliente con ese administrador.':'Agrega tu primer cliente con “+ Cliente”.')]));
+    // proveedores (lista)
+    $('#t-prov').replaceChildren(...(provs.length? provs.map(p=>h('tr',{class:'click'+(S.selProv===p.id?' sel':''),...rowKey(()=>{S.selProv=p.id;render();})},
+      h('td',{},sp(p.nombre, provPill(p), ejPill(p))), h('td',{class:'n mut'},pct(provPct(p,'NA'))), h('td',{class:'n mut'},pct(provPct(p,'CF'))), nCell(s.p[p.id]||0,{sign:true}),
+      h('td',{class:'acts'}, S.canWrite?h('button',{class:'btn sm',type:'button',onclick:e=>{e.stopPropagation();editEnt('proveedores',p.id);}},'Editar'):null)
+    )) : [emptyRow(5,'Agrega tu primer proveedor con “+ Proveedor”.')]));
+    renderDetail('cli'); renderDetail('prov');
+    fillSelects();
+    renderEC(s);
+    if (puede('caja')) renderCaja(s);
+    if (puede('usr')) renderUsr();
+  }
+
+  // ---------- Movimientos ----------
+  function filteredMovs(movs){
+    const fc=$('#f-cli').value, fp=$('#f-prov').value, ft=$('#f-tipo').value, fmn=$('#f-mes').value, fa=$('#f-adm').value;
+    const admOk = m => { if(!fa) return true; const c=S.cli.get(m.clienteId); const a=c?c.atiende||'':''; return fa==='__none'? (!a && !!m.clienteId) : a===fa; };
+    return movs.filter(m=>admOk(m)&&(!fc||m.clienteId===fc)&&(!fp||m.proveedorId===fp)&&(!ft||m.tipo===ft)&&(!fmn||(m.fecha||'').startsWith(fmn)));
+  }
+  function pctCell(m, k, kb){
+    if (m.tipo==='noident' && k==='pctProveedor' && m.pctProveedor!=null) return h('td',{class:'n mut'},pct(m.pctProveedor));
+    if (m.tipo!=='deposito') return h('td',{class:'n mut'},'—');
+    const ch = m[kb]!=null && Math.abs(m[k]-m[kb])>1e-9;
+    return h('td',{class:'n '+(ch?'changed':'mut'), title: ch?('Base: '+pct(m[kb])):null}, pct(m[k])+(ch?' *':''));
+  }
+  function renderMovs(movs){
+    const list = filteredMovs(movs);
+    $('#t-mov').replaceChildren(...(list.length? list.map(m=>h('tr',{},
+      h('td',{class:'d'},m.fecha), h('td',{},sp(tipoPill(m.tipo), modPill(m.modalidad), m.lineaId?h('span',{class:'pill',title:'Viene de un estado de cuenta'},'Edo. cta.'):null)),
+      h('td',{},cliName(m)), h('td',{},m.proveedorId?nameOf(S.prov,m.proveedorId):'—'),
+      h('td',{class:'mut'},[m.referencia,m.concepto].filter(Boolean).join(' · ')||'—'),
+      nCell(m.monto), pctCell(m,'pctCliente','baseCliente'), pctCell(m,'pctProveedor','baseProveedor'),
+      nCell(m.efCliente,{sign:true}), nCell(m.efProveedor,{sign:true}), nCell(m.utilidad,{sign:true}),
+      h('td',{class:'acts'}, S.canWrite?armBtn('Borrar','¿Seguro?',()=>borrarMov(m.id)):null)
+    )) : [emptyRow(12,'No hay movimientos con estos filtros.')]));
+    const sum = k => list.reduce((a,m)=>a+(m[k]||0),0);
+    $('#t-mov-foot').replaceChildren(list.length? h('tr',{},h('td',{colspan:5,style:'font-weight:600'},list.length+' movimientos'),
+      nCell(list.filter(m=>m.tipo==='deposito').reduce((a,m)=>a+m.monto,0)), h('td',{}),h('td',{}),
+      nCell(sum('efCliente'),{sign:true}), nCell(sum('efProveedor'),{sign:true}), nCell(sum('utilidad'),{sign:true}), h('td',{})) : '');
+  }
+  function armBtn(label, confirmLabel, fn, cls='danger'){
+    const b = h('button',{class:'btn sm '+cls,type:'button'},label);
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent=confirmLabel; setTimeout(()=>{b.classList.remove('armed');b.textContent=label;},3000); return; }
+      b.disabled=true; try { await fn(); } finally { b.disabled=false; }
+    });
+    return b;
+  }
+  async function borrarMov(id){
+    const m = S.mov.get(id);
+    try {
+      await store.del('movimientos',id);
+      if (m && m.lineaId && S.lin.has(m.lineaId)) await store.upd('edocta', m.lineaId, {estado:'pendiente', movId:''});
+      if (m && m.cajaId && S.caja.has(m.cajaId)) await store.del('caja', m.cajaId);
+      toast(m&&m.lineaId? 'Movimiento borrado. La línea del estado de cuenta regresó a pendiente.' : m&&m.cajaId? 'Movimiento borrado, también de la caja.' : 'Movimiento borrado');
+    } catch(e){ toast(writeErr(e)); }
+  }
+
+  function renderDetail(kind){
+    const isC = kind==='cli', id = isC?S.selCli:S.selProv, map = isC?S.cli:S.prov, box=$(isC?'#d-cli':'#d-prov');
+    if (!id || !map.get(id)){ box.replaceChildren(h('div',{class:'empty'}, isC?'Elige un cliente para ver su estado de cuenta.':'Elige un proveedor para ver sus movimientos.')); return; }
+    const ent = map.get(id), field = isC?'clienteId':'proveedorId', ef = isC?'efCliente':'efProveedor';
+    const movs = sortedMovs().filter(m=>m[field]===id).reverse();
+    let run=0; const rows = movs.map(m=>{ run=r2(run+(m[ef]||0)); return {m,run}; }).reverse();
+    const dep = movs.filter(m=>m.tipo==='deposito').reduce((a,m)=>a+m.monto,0);
+    const util = movs.reduce((a,m)=>a+(m.utilidad||0),0);
+    const noid = !isC && esInterno(ent) ? [...S.mov.values()].filter(m=>m.tipo==='noident' && m.proveedorId===id).reduce((a,m)=>a+(m.efNoid||0),0) : null;
+    box.replaceChildren(
+      h('div',{class:'panel-h'},h('h2',{},isC?'Estado de cuenta · ':'Proveedor · ',ent.nombre),
+        S.canWrite?h('button',{class:'btn sm primary',type:'button',onclick:()=>openMov(isC?{clienteId:id}:{proveedorId:id})},'+ Movimiento'):null),
+      h('div',{class:'detail-meta'},
+        h('div',{},h('span',{class:'eyebrow'},'Saldo'),h('b',{class:run<0?'neg':''},fm(run))),
+        h('div',{},h('span',{class:'eyebrow'},'Total depositado'),h('b',{},fm(dep))),
+        h('div',{},h('span',{class:'eyebrow'},'Utilidad generada'),h('b',{},fm(util))),
+        isC? h('div',{},h('span',{class:'eyebrow'},'% base'),h('b',{},sp(pct(ent.comision), modPill(ent.modalidad))))
+           : h('div',{},h('span',{class:'eyebrow'},'% N/A · C/F'),h('b',{},pct(provPct(ent,'NA'))+' · '+pct(provPct(ent,'CF')))),
+        noid!=null? h('div',{},h('span',{class:'eyebrow'},'No identificado'),h('b',{class:noid?'changed':''},fm(noid))) : null,
+        isC? h('div',{},h('span',{class:'eyebrow'},'Atiende'),h('b',{style:'font-family:var(--f-body);font-weight:600'},ent.atiende||'Sin asignar'))
+           : h('div',{},h('span',{class:'eyebrow'},'Tipo'),h('b',{style:'font-family:var(--f-body);font-weight:600'},esInterno(ent)?'Interno':'Externo'))),
+      ent.notas?h('p',{class:'hint',style:'padding:8px 16px 0;margin:0'},ent.notas):null,
+      h('div',{class:'tscroll'},h('table',{},h('thead',{},h('tr',{},h('th',{},'Fecha'),h('th',{},'Tipo'),h('th',{},isC?'Proveedor':'Cliente'),h('th',{class:'n'},'Monto'),h('th',{class:'n'},'Movimiento'),h('th',{class:'n'},'Saldo'))),
+        h('tbody',{},rows.length? rows.map(({m,run})=>h('tr',{},
+          h('td',{class:'d'},m.fecha), h('td',{},sp(tipoPill(m.tipo), modPill(m.modalidad))),
+          h('td',{},isC?(m.proveedorId?nameOf(S.prov,m.proveedorId):'—'):cliName(m)),
+          nCell(m.monto), nCell(m[ef],{sign:true}), nCell(run,{sign:true}))) : emptyRow(6,'Sin movimientos todavía.'))))
+    );
+  }
+  function fillSelects(){
+    const keep = (sel, items, first) => { const v=sel.value; sel.replaceChildren(...(first!=null?[h('option',{value:''},first)]:[]), ...items.map(i=>h('option',{value:i.id},i.nombre))); if ([...sel.options].some(o=>o.value===v)) sel.value=v; };
+    const ad = admins().map(n=>({id:n,nombre:n})).concat([{id:'__none',nombre:'Sin asignar'}]);
+    keep($('#f-adm'), ad, 'Todos los administradores'); keep($('#f-cli-adm'), ad, 'Todos los administradores');
+    $('#dl-admins').replaceChildren(...admins().map(n=>h('option',{value:n})));
+    keep($('#f-cli'), byName(S.cli), 'Todos los clientes'); keep($('#f-prov'), byName(S.prov), 'Todos los proveedores');
+    if (!$('#dlg-mov').open){ keep($('#m-cli'), byName(S.cli), '— Elige cliente —'); keep($('#m-prov'), byName(S.prov), '— Elige proveedor —'); }
+    const ints = byName(S.prov).filter(esInterno);
+    keep($('#ec-prov'), ints, ints.length?'— Elige proveedor —':'Sin proveedores internos');
+    keep($('#ec-ver'), ints, 'Todos los internos');
+    $('#ec-noint').hidden = !!ints.length;
+  }
+
+  // ---------- Navegación ----------
+  function go(v){
+    if (S.rol && ROLES[S.rol] && !puede(v)) v = ROLES[S.rol].tabs[0];
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected', String(b.dataset.v===v)));
+    document.querySelectorAll('.view').forEach(s=>s.hidden = s.id!=='v-'+v);
+    try{ localStorage.setItem('bc-tab',v); }catch(e){}
+  }
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.v)));
+  document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.goto)));
+  function openCli(id){ S.selCli=id; go('cli'); render(); }
+  function openProv(id){ S.selProv=id; go('prov'); render(); }
+  function verAdm(k){ $('#f-adm').value = k||'__none'; $('#f-mes').value = mesActual(); go('mov'); renderMovs(sortedMovs()); }
+  ['#f-cli','#f-prov','#f-tipo','#f-mes','#f-adm'].forEach(s=>$(s).addEventListener('change',()=>renderMovs(sortedMovs())));
+  $('#f-cli-adm').addEventListener('change',render);
+  document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
+
+  // ---------- Formulario de movimiento ----------
+  const M = { tipo:()=>document.querySelector('input[name="tipo"]:checked').value };
+  const helpTxt = {
+    deposito:'El cliente deposita al proveedor. Al cliente se le abona el monto menos nuestra comisión; al proveedor, el monto menos la suya. La diferencia es nuestra utilidad.',
+    pago:'Pagamos por cuenta del cliente con fondos que tenemos en el proveedor. Se descuenta del saldo del cliente y del proveedor.',
+    ajuste:'Corrección manual a un saldo. Usa monto negativo para restar.',
+    inicial:'Saldo con el que arranca un cliente o proveedor en el sistema. Positivo: a favor del cliente / dinero que tenemos en el proveedor. Negativo: el cliente nos debe / le debemos al proveedor.'
+  };
+  const setPP = () => { const p=S.prov.get($('#m-prov').value); $('#m-pp').value=p?String(provPct(p,$('#m-mod').value)??''):''; };
+  function defaultsPct(){
+    const c=S.cli.get($('#m-cli').value);
+    $('#m-pc').value = c? String(c.comision??'') : '';
+    if (c && MOD[c.modalidad]) $('#m-mod').value=c.modalidad;
+    setPP();
+  }
+  function syncForm(){
+    const t=M.tipo(), libre = t==='ajuste'||t==='inicial';
+    $('#m-help').textContent = helpTxt[t];
+    $('#m-pc-w').hidden = $('#m-pp-w').hidden = $('#m-mod-w').hidden = t!=='deposito';
+    $('#m-aplica-w').hidden = !libre;
+    const ap=$('#m-aplica').value;
+    $('#m-cli-w').hidden = libre && ap!=='cliente';
+    $('#m-prov-w').hidden = libre && ap!=='proveedor';
+    preview();
+  }
+  function readForm(){
+    return { tipo:M.tipo(), modalidad:$('#m-mod').value, fecha:$('#m-fecha').value, clienteId:$('#m-cli').value, proveedorId:$('#m-prov').value, aplica:$('#m-aplica').value,
+      monto:$('#m-monto').value, pc:$('#m-pc').value, pp:$('#m-pp').value, referencia:$('#m-ref').value.trim(), concepto:$('#m-concepto').value.trim() };
+  }
+  function baseHint(sel, inp, map, quien, getBase){
+    const e=map.get($(sel).value), hEl=$(inp+'-h');
+    if (!e){ hEl.textContent=''; return; }
+    const base=getBase?getBase(e):e.comision, v=num($(inp).value);
+    if (base==null){ hEl.textContent=''; return; }
+    if (isFinite(v) && Math.abs(v-base)>1e-9){
+      hEl.className='hint changed';
+      hEl.replaceChildren('Distinto a la base ('+pct(base)+') ', h('button',{type:'button',onclick:()=>{ $(inp).value=String(base); preview(); }},'Usar base'));
+    } else { hEl.className='hint'; hEl.textContent='Base '+quien+': '+pct(base); }
+  }
+  function preview(){
+    baseHint('#m-cli','#m-pc',S.cli,'del cliente');
+    baseHint('#m-prov','#m-pp',S.prov,'del proveedor en '+MOD[$('#m-mod').value], p=>provPct(p,$('#m-mod').value));
+    const f=readForm(), box=$('#m-prev'), m=num(f.monto);
+    if (!isFinite(m)){ box.replaceChildren(h('div',{},h('span',{class:'mut'},'Escribe un monto para ver el efecto en los saldos.'))); return; }
+    const r = calcMov(f), libre = f.tipo==='ajuste'||f.tipo==='inicial';
+    const line=(l,v,sign)=>h('div',{},h('span',{},l),h('b',{class:sign?(v<0?'neg':v>0?'pos':''):''},(v>0&&sign?'+':'')+fm(v)));
+    const rows=[];
+    if (!libre||f.aplica==='cliente') rows.push(line('Saldo de '+(f.clienteId?nameOf(S.cli,f.clienteId):'cliente'), r.efCliente, true));
+    if (!libre||f.aplica==='proveedor') rows.push(line('Saldo de '+(f.proveedorId?nameOf(S.prov,f.proveedorId):'proveedor'), r.efProveedor, true));
+    if (f.tipo==='deposito') rows.push(line('Nuestra utilidad', isFinite(r.utilidad)?r.utilidad:0, true));
+    box.replaceChildren(...rows);
+  }
+  function lockForm(on){
+    document.querySelectorAll('input[name="tipo"]').forEach(r=>r.disabled = on && !r.checked);
+    $('#m-prov').disabled=on; $('#m-monto').readOnly=on; $('#m-fecha').readOnly=on;
+  }
+  function openMov(pre={}){
+    if (!S.cli.size && !S.prov.size){ toast('Primero da de alta al menos un cliente o un proveedor.'); go('cli'); return; }
+    $('#form-mov').reset(); lockForm(false);
+    S.linea = null; $('#m-linea').hidden=true; $('#m-title').textContent='Nuevo movimiento';
+    const keepSel = (sel, items, first) => sel.replaceChildren(h('option',{value:''},first), ...items.map(i=>h('option',{value:i.id},i.nombre)));
+    keepSel($('#m-cli'), byName(S.cli), '— Elige cliente —'); keepSel($('#m-prov'), byName(S.prov), '— Elige proveedor —');
+    $('#m-fecha').value=today();
+    if (pre.clienteId) $('#m-cli').value=pre.clienteId;
+    if (pre.proveedorId) $('#m-prov').value=pre.proveedorId;
+    if (pre.linea){
+      const l=S.lin.get(pre.linea); if (!l) return;
+      S.linea = pre.linea;
+      const esAbono = (l.abono||0) > 0;
+      $(esAbono?'#m-t-dep':'#m-t-pago').checked = true;
+      $('#m-prov').value=l.proveedorId; $('#m-monto').value=String(esAbono? l.abono : l.cargo); $('#m-fecha').value=l.fecha;
+      $('#m-ref').value=l.referencia||''; $('#m-concepto').value=l.descripcion||'';
+      $('#m-title').textContent = esAbono? 'Asignar depósito a un cliente' : 'Asignar cargo a un cliente';
+      $('#m-linea').replaceChildren(h('span',{class:'eyebrow'},(lineState(l)==='noident'?'Pasar de No identificados a cliente · ':'Desde estado de cuenta · ')+nameOf(S.prov,l.proveedorId)), h('span',{},l.fecha+' · '+fm(esAbono?l.abono:l.cargo)+' · '+(l.descripcion||'Sin descripción')));
+      $('#m-linea').hidden=false; lockForm(true);
+    }
+    defaultsPct(); $('#m-err').textContent=''; syncForm();
+    $('#dlg-mov').showModal(); (pre.linea? $('#m-cli') : $('#m-monto')).focus();
+  }
+  $('#btn-nuevo').addEventListener('click',()=>openMov());
+  document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener('change',syncForm));
+  $('#m-aplica').addEventListener('change',syncForm);
+  $('#m-cli').addEventListener('change',()=>{ const c=S.cli.get($('#m-cli').value); $('#m-pc').value=c?String(c.comision??''):''; if(c&&MOD[c.modalidad]) $('#m-mod').value=c.modalidad; setPP(); preview(); });
+  $('#m-prov').addEventListener('change',()=>{ setPP(); preview(); });
+  $('#m-mod').addEventListener('change',()=>{ setPP(); preview(); });
+  ['#m-monto','#m-pc','#m-pp'].forEach(s=>$(s).addEventListener('input',preview));
+  let saving=false;
+  $('#form-mov').addEventListener('submit', async e=>{
+    e.preventDefault(); if (saving) return;
+    const f=readForm(), monto=num(f.monto), err=$('#m-err'), libre = f.tipo==='ajuste'||f.tipo==='inicial';
+    const useCli = !libre||f.aplica==='cliente', useProv = !libre||f.aplica==='proveedor';
+    if (!f.fecha) return err.textContent='Falta la fecha.';
+    if (useCli && !f.clienteId) return err.textContent='Elige el cliente.';
+    if (useProv && !f.proveedorId) return err.textContent='Elige el proveedor.';
+    if (!isFinite(monto) || monto===0) return err.textContent='Escribe un monto válido.';
+    if (!libre && monto<0) return err.textContent='El monto debe ser positivo. Para restar usa un Ajuste.';
+    if (f.tipo==='deposito' && (!isFinite(num(f.pc))||!isFinite(num(f.pp)))) return err.textContent='Faltan los porcentajes de comisión.';
+    const r=calcMov(f);
+    const doc = { tipo:f.tipo, fecha:f.fecha, monto:r2(monto), clienteId:useCli?f.clienteId:'', proveedorId:useProv?f.proveedorId:'',
+      efCliente:r.efCliente, efProveedor:r.efProveedor, utilidad:r.utilidad, referencia:f.referencia, concepto:f.concepto, creado:Date.now() };
+    if (f.tipo==='deposito'){
+      doc.pctCliente=r.pctCliente; doc.pctProveedor=r.pctProveedor; doc.modalidad=f.modalidad;
+      const bc=(S.cli.get(f.clienteId)||{}).comision, bp=provPct(S.prov.get(f.proveedorId),f.modalidad);
+      if (bc!=null) doc.baseCliente=bc; if (bp!=null) doc.baseProveedor=bp;
+    }
+    const linea = S.linea; if (linea) doc.lineaId = linea;
+    saving=true; $('#m-save').disabled=true;
+    try {
+      const id = await store.add('movimientos',doc);
+      if (linea){
+        const prevMov = (S.lin.get(linea)||{}).movId;
+        await store.upd('edocta', linea, {estado:'asignado', movId:id});
+        if (prevMov && prevMov!==id && S.mov.has(prevMov)) await store.del('movimientos', prevMov);
+      }
+      $('#dlg-mov').close(); toast(linea? 'Asignado a '+nameOf(S.cli,f.clienteId) : 'Movimiento guardado');
+    } catch(ex){ err.textContent=writeErr(ex); }
+    finally { saving=false; $('#m-save').disabled=false; }
+  });
+  $('#dlg-mov').addEventListener('close',()=>{ S.linea=null; lockForm(false); });
+
+  // ---------- Clientes / proveedores ----------
+  let entCtx=null;
+  function editEnt(col,id){
+    entCtx={col,id}; const isC=col==='clientes', e=id?(isC?S.cli:S.prov).get(id):{};
+    $('#e-title').textContent=(id?'Editar ':'Nuevo ')+(isC?'cliente':'proveedor');
+    $('#e-atiende-w').hidden=!isC; $('#e-cli-w').hidden=!isC; $('#e-prov-w').hidden=isC; $('#e-tipo-w').hidden=isC;
+    $('#e-ini-w').hidden=!!id;
+    $('#e-ini-h').textContent = isC? 'Positivo: a favor del cliente. Negativo: nos debe.' : 'Positivo: dinero nuestro en el proveedor. Negativo: le debemos.';
+    $('#e-hint').textContent = isC? 'El % y la modalidad se cargan solos en cada depósito. Si una operación lleva otro %, lo cambias ahí y la base no cambia.' : 'En cada depósito se usa el % según la modalidad del cliente (N/A o C/F). Se puede cambiar por operación.';
+    $('#e-nombre').value=e.nombre||''; $('#e-atiende').value=e.atiende||''; $('#e-notas').value=e.notas||'';
+    $('#e-com').value=e.comision??''; $('#e-mod').value = MOD[e.modalidad]? e.modalidad : 'NA';
+    $('#e-na').value = isC?'':(provPct(e,'NA')??''); $('#e-cf').value = isC?'':(provPct(e,'CF')??'');
+    $('#e-tipo').value = e.tipo==='interno'?'interno':'externo';
+    $('#e-ini').value=''; $('#e-ini-f').value=today(); $('#e-err').textContent='';
+    $('#dlg-ent').showModal(); $('#e-nombre').focus();
+  }
+  $('#btn-add-cli').addEventListener('click',()=>editEnt('clientes',null));
+  $('#btn-add-prov').addEventListener('click',()=>editEnt('proveedores',null));
+  $('#form-ent').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const isC=entCtx.col==='clientes', nombre=$('#e-nombre').value.trim(), err=$('#e-err');
+    const okPct = v => isFinite(v) && v>=0 && v<=100;
+    if (!nombre) return err.textContent='Escribe el nombre.';
+    const prev = entCtx.id ? (isC?S.cli:S.prov).get(entCtx.id) : null;
+    const data={ ...(prev||{}), nombre, notas:$('#e-notas').value.trim() };
+    if (isC){
+      const com=num($('#e-com').value);
+      if (!okPct(com)) return err.textContent='El % base debe ser un número entre 0 y 100.';
+      data.comision=com; data.modalidad=$('#e-mod').value;
+      data.atiende=$('#e-atiende').value.trim().replace(/\s+/g,' ');
+    } else {
+      const na=num($('#e-na').value), cf=num($('#e-cf').value);
+      if (!okPct(na)||!okPct(cf)) return err.textContent='Escribe el % de N/A y el de C/F (entre 0 y 100).';
+      data.comisionNA=na; data.comisionCF=cf; data.comision=na; data.tipo=$('#e-tipo').value;
+    }
+    let ini=0;
+    if (!entCtx.id && $('#e-ini').value.trim()){
+      ini=num($('#e-ini').value);
+      if (!isFinite(ini)) return err.textContent='El saldo inicial no es un número válido.';
+      if (!$('#e-ini-f').value) return err.textContent='Falta la fecha del saldo inicial.';
+    }
+    $('#e-save').disabled=true;
+    try {
+      let id=entCtx.id;
+      if (id) await store.set(entCtx.col, id, data); else id = await store.add(entCtx.col, data);
+      if (ini){
+        await store.add('movimientos',{ tipo:'inicial', fecha:$('#e-ini-f').value, monto:r2(ini),
+          clienteId:isC?id:'', proveedorId:isC?'':id, efCliente:isC?r2(ini):0, efProveedor:isC?0:r2(ini), utilidad:0,
+          referencia:'', concepto:'Saldo inicial', creado:Date.now() });
+      }
+      $('#dlg-ent').close(); toast('Guardado');
+    } catch(ex){ err.textContent=writeErr(ex); }
+    finally { $('#e-save').disabled=false; }
+  });
+
+  // ---------- Estados de cuenta: lectura de archivo ----------
+  const CAMPOS = [
+    ['fecha','Fecha',true], ['descripcion','Descripción',false], ['referencia','Referencia',false],
+    ['abono','Abono / depósito',false], ['cargo','Cargo / retiro',false], ['monto','Monto (con signo)',false], ['saldo','Saldo',false]
+  ];
+  const GUESS = {
+    fecha:/fecha|date|f\.?\s*oper|dia/i, descripcion:/descrip|concepto|detalle|movimiento|leyenda/i, referencia:/refer|folio|rastreo|clave|autoriz|^ref/i,
+    abono:/abono|dep[oó]sito|cr[eé]dito|ingreso|entrada/i, cargo:/cargo|retiro|d[eé]bito|egreso|salida/i, monto:/^(monto|importe|cantidad)$/i, saldo:/saldo|balance/i
+  };
+  const norm = s => String(s??'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+  const MESES = {ene:1,jan:1,feb:2,mar:3,abr:4,apr:4,may:5,jun:6,jul:7,ago:8,aug:8,sep:9,set:9,oct:10,nov:11,dic:12,dec:12};
+  const pad = n => String(n).padStart(2,'0');
+  function parseFecha(v){
+    if (v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+    if (typeof v==='number' && v>20000 && v<80000){ const d=new Date(Math.round((v-25569)*864e5)); return d.toISOString().slice(0,10); }
+    const s = norm(v); let m;
+    if ((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return ok(+m[1],+m[2],+m[3]);
+    if ((m=s.match(/^(\d{1,2})[-\/. ]+([a-z]{3,})\.?[-\/. ]+(\d{2,4})/))) return ok(yy(+m[3]), MESES[m[2].slice(0,3)], +m[1]);
+    if ((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) return ok(yy(+m[3]), +m[2], +m[1]);
+    if ((m=s.match(/^(\d{2})(\d{2})(\d{4})$/))) return ok(+m[3], +m[2], +m[1]);
+    return '';
+    function yy(y){ return y<100? 2000+y : y; }
+    function ok(y,mo,d){ return (y>1990 && mo>=1 && mo<=12 && d>=1 && d<=31)? y+'-'+pad(mo)+'-'+pad(d) : ''; }
+  }
+  function parseMonto(v){
+    if (typeof v==='number') return v;
+    let s = String(v??'').trim(); if (!s) return 0;
+    let neg = /^\(.*\)$/.test(s) || /-\s*$/.test(s) || /^-/.test(s);
+    s = s.replace(/[()$\s]|mxn|mn/gi,'').replace(/-/g,'').replace(/,/g,'');
+    const x = parseFloat(s); return isFinite(x)? (neg?-x:x) : NaN;
+  }
+  function cyrb53(str, seed=0){
+    let h1=0xdeadbeef^seed, h2=0x41c6ce57^seed;
+    for (let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+    h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+    h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+    return (h2>>>0).toString(16).padStart(8,'0')+(h1>>>0).toString(16).padStart(8,'0');
+  }
+  function findHeader(rows){
+    let best=0, bestScore=-1;
+    for (let i=0;i<Math.min(rows.length,25);i++){
+      const cells = rows[i].map(norm).filter(Boolean);
+      const score = cells.filter(c=>Object.values(GUESS).some(rx=>rx.test(c))).length*3 + cells.filter(c=>/[a-z]/.test(c)).length;
+      if (cells.length>=2 && score>bestScore){ best=i; bestScore=score; }
+    }
+    return best;
+  }
+  function guessMap(headers, saved){
+    const map={};
+    if (saved){ for (const [k,name] of Object.entries(saved)){ const i=headers.findIndex(x=>norm(x)===norm(name)); if (i>=0) map[k]=i; } if (map.fecha!=null) return map; }
+    const used=new Set();
+    for (const [k] of CAMPOS){ const i=headers.findIndex((x,ix)=>!used.has(ix) && GUESS[k].test(norm(x))); if (i>=0){ map[k]=i; used.add(i); } }
+    if (map.abono!=null || map.cargo!=null) delete map.monto;
+    return map;
+  }
+  function buildLines(){
+    const I=S.imp; if (!I) return [];
+    const mp=I.map, out=[], seen={};
+    for (const row of I.rows.slice(I.header+1)){
+      const fecha = mp.fecha!=null? parseFecha(row[mp.fecha]) : '';
+      let abono=0, cargo=0;
+      if (mp.abono!=null || mp.cargo!=null){
+        const a = mp.abono!=null? parseMonto(row[mp.abono]) : 0, c = mp.cargo!=null? parseMonto(row[mp.cargo]) : 0;
+        abono = isFinite(a)? Math.abs(a) : 0; cargo = isFinite(c)? Math.abs(c) : 0;
+      } else if (mp.monto!=null){
+        const x = parseMonto(row[mp.monto]); if (isFinite(x)){ if (x>=0) abono=x; else cargo=-x; }
+      }
+      if (!fecha || (!abono && !cargo)) continue;
+      const descripcion = mp.descripcion!=null? String(row[mp.descripcion]??'').trim().replace(/\s+/g,' ') : '';
+      const referencia = mp.referencia!=null? String(row[mp.referencia]??'').trim() : '';
+      const sRaw = mp.saldo!=null? parseMonto(row[mp.saldo]) : NaN, saldo = isFinite(sRaw)? r2(sRaw) : null;
+      const base = [I.prov, fecha, r2(abono), r2(cargo), norm(referencia), norm(descripcion), saldo??''].join('|');
+      const occ = seen[base] = (seen[base]||0)+1;
+      const id = 'L'+cyrb53(base+'|'+occ);
+      out.push({ id, dup:S.lin.has(id), data:{ proveedorId:I.prov, fecha, descripcion, referencia, abono:r2(abono), cargo:r2(cargo), saldo, estado:'pendiente', movId:'', archivo:I.nombre, importado:Date.now() } });
+    }
+    return out;
+  }
+  async function leerArchivo(file){
+    const err=$('#ec-err'); err.textContent='';
+    const prov=$('#ec-prov').value;
+    if (!prov){ toast('Primero elige el proveedor interno.'); $('#ec-file').value=''; return; }
+    if (/\.pdf$/i.test(file.name)){ toast('Los PDF todavía no se pueden leer aquí. Descarga el estado de cuenta en Excel o CSV.'); $('#ec-file').value=''; return; }
+    if (!window.XLSX){ toast('No se cargó el lector de Excel. Revisa tu conexión y recarga la página.'); return; }
+    try{
+      const buf = await file.arrayBuffer();
+      const isCsv = /\.(csv|txt)$/i.test(file.name);
+      let wb;
+      if (isCsv){
+        let text = new TextDecoder('utf-8').decode(buf);
+        if (text.includes('\ufffd')) text = new TextDecoder('windows-1252').decode(buf);
+        wb = XLSX.read(text,{type:'string',raw:true});
+      } else wb = XLSX.read(buf,{type:'array',cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}).filter(r=>r.some(c=>String(c).trim()!==''));
+      if (!rows.length) throw new Error('vacío');
+      const header = findHeader(rows);
+      const p = S.prov.get(prov);
+      S.imp = { prov, nombre:file.name, rows, header, map:guessMap(rows[header].map(String), p&&p.mapeo) };
+      renderImport();
+    }catch(e){ S.imp=null; $('#ec-map').hidden=true; toast('No pude leer ese archivo. Prueba con la versión en Excel o CSV del estado de cuenta.'); }
+  }
+  function renderImport(){
+    const I=S.imp, box=$('#ec-map');
+    if (!I){ box.hidden=true; return; }
+    box.hidden=false;
+    const headers = I.rows[I.header].map(x=>String(x).trim());
+    $('#ec-file-info').replaceChildren(h('span',{},h('b',{style:'font-family:var(--f-body);font-weight:600'},I.nombre),' · '+nameOf(S.prov,I.prov)),
+      h('label',{class:'hint',style:'display:inline-flex;gap:6px;align-items:center'},'Encabezados en la fila',
+        h('input',{type:'number',id:'ec-hrow',min:'1',max:String(I.rows.length),value:String(I.header+1),style:'width:70px;padding:4px 6px',onchange:e=>{ const v=Math.max(1,Math.min(I.rows.length,+e.target.value||1)); I.header=v-1; I.map=guessMap(I.rows[I.header].map(String)); renderImport(); }})));
+    $('#ec-mapgrid').replaceChildren(...CAMPOS.map(([k,label,req])=>h('label',{class:'f'},label+(req?' *':''),
+      h('select',{id:'ec-m-'+k,onchange:e=>{ const v=e.target.value; if (v==='') delete I.map[k]; else I.map[k]=+v; renderImport(); }},
+        h('option',{value:''},'— No viene —'), ...headers.map((x,i)=>{ const o=h('option',{value:String(i)},x||('Columna '+(i+1))); if (I.map[k]===i) o.selected=true; return o; })))));
+    const lines = buildLines(), nuevos = lines.filter(l=>!l.dup);
+    const prevRows = lines.slice(0,12).map(l=>h('tr',{class:l.dup?'dup':''},
+      h('td',{class:'d'},l.data.fecha), h('td',{class:'desc'},l.data.descripcion||'—'), h('td',{class:'mut'},l.data.referencia||'—'),
+      h('td',{class:'n pos'},l.data.abono?fm(l.data.abono):''), h('td',{class:'n neg'},l.data.cargo?fm(l.data.cargo):''), h('td',{class:'n mut'},l.data.saldo!=null?fm(l.data.saldo):''),
+      h('td',{},l.dup?h('span',{class:'pill'},'Ya cargado'):h('span',{class:'pill asig'},'Nuevo'))));
+    $('#ec-prev').replaceChildren(...(prevRows.length? prevRows : [emptyRow(7,'No encontré movimientos con esa configuración. Revisa qué columna es la fecha y cuál el monto.')]));
+    const tAb = nuevos.reduce((a,l)=>a+l.data.abono,0), tCa = nuevos.reduce((a,l)=>a+l.data.cargo,0);
+    $('#ec-sum').replaceChildren(
+      h('span',{},h('b',{},String(lines.length)),' movimientos leídos'),
+      h('span',{},h('b',{},String(nuevos.length)),' nuevos'),
+      h('span',{class:'mut'},h('b',{},String(lines.length-nuevos.length)),' ya cargados (se omiten)'),
+      h('span',{},'Abonos ',h('b',{class:'pos'},fm(tAb))), h('span',{},'Cargos ',h('b',{class:'neg'},fm(tCa))),
+      lines.length>12? h('span',{class:'hint'},'Vista previa de los primeros 12') : '');
+    const btn=$('#ec-import'); btn.disabled = !nuevos.length || !S.canWrite; btn.textContent = nuevos.length? 'Importar '+nuevos.length+' nuevos' : 'Nada nuevo que importar';
+  }
+  $('#ec-file').addEventListener('change',e=>{ const f=e.target.files[0]; if (f) leerArchivo(f); });
+  $('#ec-prov').addEventListener('change',()=>{ const f=$('#ec-file').files[0]; if (f) leerArchivo(f); });
+  $('#ec-cancel').addEventListener('click',()=>{ S.imp=null; $('#ec-file').value=''; renderImport(); });
+  $('#ec-import').addEventListener('click', async ()=>{
+    const I=S.imp; if (!I) return;
+    if (I.map.fecha==null) return $('#ec-err').textContent='Indica qué columna es la fecha.';
+    const nuevos = buildLines().filter(l=>!l.dup), btn=$('#ec-import');
+    btn.disabled=true; let n=0;
+    try{
+      for (let i=0;i<nuevos.length;i+=5){
+        await Promise.all(nuevos.slice(i,i+5).map(l=>store.set('edocta', l.id, l.data)));
+        n=Math.min(i+5,nuevos.length); btn.textContent='Importando '+n+' de '+nuevos.length+'…';
+      }
+      const headers = I.rows[I.header].map(x=>String(x).trim()), mapeo={};
+      for (const [k,i] of Object.entries(I.map)) mapeo[k]=headers[i];
+      if (S.prov.has(I.prov)) await store.upd('proveedores', I.prov, {mapeo});
+      toast(nuevos.length+' movimientos importados. Ahora asígnalos a sus clientes.');
+      $('#ec-ver').value=I.prov; S.ecFiltro='pendiente';
+      S.imp=null; $('#ec-file').value=''; renderImport(); render();
+    }catch(ex){ $('#ec-err').textContent=writeErr(ex)+(n?(' Se importaron '+n+'; vuelve a cargar el archivo para subir el resto, los repetidos se omiten.'):''); btn.disabled=false; }
+  });
+
+  // ---------- Estados de cuenta: líneas ----------
+  const EST = {pendiente:['Por asignar','pend'], noident:['No identificado','noid'], asignado:['Asignado','asig']};
+  function renderEC(s){
+    const fp=$('#ec-ver').value, q=norm($('#ec-q').value);
+    const all = [...S.lin.entries()].map(([id,l])=>({id,...l,st:lineState(l)}))
+      .filter(l=>(!fp||l.proveedorId===fp) && (!q || norm(l.descripcion+' '+l.referencia).includes(q)))
+      .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'') || (b.importado||0)-(a.importado||0));
+    const cnt = {pendiente:[0,0], noident:[0,0], asignado:[0,0], todos:[all.length, all.reduce((a,l)=>a+lineMonto(l),0)]};
+    for (const l of all){ cnt[l.st][0]++; cnt[l.st][1]+=lineMonto(l); }
+    $('#ec-chips').replaceChildren(...[['pendiente','Por asignar'],['noident','No identificados'],['asignado','Asignados'],['todos','Todos']].map(([k,label])=>
+      h('button',{class:'chip',type:'button','aria-pressed':String(S.ecFiltro===k),onclick:()=>{S.ecFiltro=k;render();}},label,h('b',{},String(cnt[k][0])),h('span',{class:'mut'},fm(cnt[k][1])))));
+    const list = all.filter(l=>S.ecFiltro==='todos'||l.st===S.ecFiltro);
+    const shown = list.slice(0,400);
+    const rows = shown.map(l=>{
+      const m = l.st==='asignado'? S.mov.get(l.movId) : null;
+      const acts = !S.canWrite? null : l.st==='asignado'
+        ? armBtn('Desasignar','¿Desasignar?',()=>desasignar(l.id),'')
+        : [h('button',{class:'btn sm primary',type:'button',onclick:()=>openMov({linea:l.id})}, l.st==='noident'?'Pasar a cliente':'Asignar'),
+           l.st==='pendiente'
+             ? h('button',{class:'btn sm warn',type:'button',onclick:()=>marcar(l.id,'noident')},'No identificado')
+             : h('button',{class:'btn sm',type:'button',onclick:()=>marcar(l.id,'pendiente')},'Regresar a pendiente')];
+      return h('tr',{},
+        h('td',{class:'d'},l.fecha), h('td',{},nameOf(S.prov,l.proveedorId)), h('td',{class:'desc'},l.descripcion||'—'), h('td',{class:'mut'},l.referencia||'—'),
+        h('td',{class:'n pos'},l.abono?fm(l.abono):''), h('td',{class:'n neg'},l.cargo?fm(l.cargo):''),
+        h('td',{},sp(h('span',{class:'pill '+EST[l.st][1]},EST[l.st][0]), m? h('span',{class:'hint'},nameOf(S.cli,m.clienteId)) : null)),
+        h('td',{class:'acts'},acts));
+    });
+    if (list.length>shown.length) rows.push(h('tr',{},h('td',{colspan:8,class:'empty'},'Mostrando 400 de '+list.length+'. Usa la búsqueda o el filtro de proveedor para ver el resto.')));
+    const vacio = !S.lin.size? 'Aún no has cargado estados de cuenta. Elige un proveedor interno y sube el archivo arriba.'
+      : S.ecFiltro==='pendiente'? 'No hay movimientos por asignar.' : 'No hay movimientos en este filtro.';
+    $('#t-ec').replaceChildren(...(rows.length? rows : [emptyRow(8,vacio)]));
+  }
+  async function marcar(id, estado){
+    const l=S.lin.get(id); if (!l) return;
+    try{
+      if (estado==='noident'){
+        const p=S.prov.get(l.proveedorId), pp=provPct(p,'NA')||0, esAbono=(l.abono||0)>0, monto=esAbono?l.abono:l.cargo;
+        const mid = await store.add('movimientos',{ tipo:'noident', fecha:l.fecha, monto:r2(monto), clienteId:'', proveedorId:l.proveedorId,
+          pctProveedor: esAbono? pp : null, efProveedor: esAbono? r2(monto*(1-pp/100)) : -r2(monto), efCliente:0,
+          efNoid: esAbono? r2(monto) : -r2(monto), utilidad:0, referencia:l.referencia||'', concepto:l.descripcion||'', lineaId:id, creado:Date.now() });
+        await store.upd('edocta', id, {estado:'noident', movId:mid});
+        toast('Marcado como no identificado. Ya suma al saldo del proveedor.');
+      } else {
+        if (l.movId && S.mov.has(l.movId)) await store.del('movimientos', l.movId);
+        await store.upd('edocta', id, {estado:'pendiente', movId:''});
+        toast('Regresó a pendiente');
+      }
+    }catch(e){ toast(writeErr(e)); }
+  }
+  async function desasignar(id){
+    const l=S.lin.get(id); if (!l) return;
+    try{ if (l.movId && S.mov.has(l.movId)) await store.del('movimientos', l.movId); await store.upd('edocta', id, {estado:'pendiente', movId:''}); toast('Desasignado. El movimiento del cliente se borró.'); }
+    catch(e){ toast(writeErr(e)); }
+  }
+  $('#ec-ver').addEventListener('change',render);
+  let qT; $('#ec-q').addEventListener('input',()=>{ clearTimeout(qT); qT=setTimeout(render,200); });
+
+  // ---------- Cajas (matriz + sucursales, multimoneda) ----------
+  const MONEDAS = ['MXN','USD','EUR','CAD','GBP'];
+  const NOMBRE_MON = {MXN:'Pesos', USD:'Dólares', EUR:'Euros', CAD:'Dólares canadienses', GBP:'Libras'};
+  const fmtMon = {}; const fmc = (n,cur='MXN') => (fmtMon[cur] ||= new Intl.NumberFormat('es-MX',{style:'currency',currency:cur,currencyDisplay:cur==='MXN'?'symbol':'code'})).format(Math.round((n||0)*100)/100);
+  const ftc = n => (n==null||!isFinite(n))? '—' : n.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:4});
+  const CT = {entrada:['Entrada','ent',1], salida:['Salida','sal',-1], gasto:['Gasto','gas',-1], utilidad:['Utilidad','uti',1], inicial:['Saldo inicial','ini',1], ajuste:['Ajuste de corte','aj',1], compra:['Compra','dep',1], venta:['Venta','pago',-1], traspaso:['Traspaso','ini',0]};
+  const SIGNED = {inicial:1, ajuste:1};
+  const CAT_BASE = ['Renta','Nómina','Luz','Agua','Teléfono e internet','Papelería','Comisiones bancarias','Mantenimiento','Transporte','Impuestos','Otros'];
+  const MATRIZ = 'matriz';
+  const CORTE_MIN = 16*60+30;
+  const cHelp = {
+    cambio:'Compra: el cliente nos entrega divisa y le pagamos pesos. Venta: le entregamos divisa y nos paga pesos. La utilidad de la venta se calcula contra el costo promedio de la divisa en esa caja.',
+    entrada:'Dinero que entra a la caja. En pesos, si lo entrega un cliente puedes cargarlo a su saldo a favor.',
+    salida:'Dinero que sale de la caja. En pesos, si se le paga a un cliente se resta de su saldo; si se envía a un proveedor se suma a lo que tenemos con él.',
+    gasto:'Gasto de operación pagado con la caja. Resta de la caja y de la utilidad neta del mes.',
+    traspaso:'Mover efectivo de una caja a otra, por ejemplo de una sucursal a la matriz. La divisa viaja con su costo promedio.',
+    utilidad:'Pasar a la caja comisiones ya generadas (en pesos).',
+    inicial:'Lo que hay en caja de esa moneda al arrancar. Para divisas, el tipo de cambio de costo sirve para calcular después la utilidad cambiaria.'
+  };
+  const cTipo = () => document.querySelector('input[name="ctipo"]:checked').value;
+  const tipoKey = c => c.tipo==='cambio'? c.operacion : c.tipo;
+  const addDays = (f,n) => { const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const fechaLarga = f => new Date(f+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'});
+
+  // Cajas: la matriz siempre existe; las sucursales viven en la colección "cajas".
+  const cajasList = () => [{id:MATRIZ, nombre:'Matriz (Caja central)', tipo:'matriz'}, ...byName(S.cajas).map(c=>({...c, tipo:'sucursal'}))];
+  const cajaName = id => id===MATRIZ? 'Matriz' : nameOf(S.cajas,id);
+  const cortesDe = k => [...S.cortes.values()].filter(c=>c.cajaId===k).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const lastCorte = k => (cortesDe(k)[0]||{}).fecha || '';
+  const isClosed = (k,f) => { const lc=lastCorte(k); return !!lc && f<=lc; };
+  function fechaOperacion(k){
+    const d=new Date(), mins=d.getHours()*60+d.getMinutes();
+    let f = mins>=CORTE_MIN? addDays(today(),1) : today();
+    const lc=lastCorte(k); if (lc && f<=lc) f=addDays(lc,1);
+    return f;
+  }
+
+  // Recorre todos los movimientos de caja en orden: saldos por caja y moneda, costo promedio, utilidad cambiaria.
+  function cajaCalc(hasta){
+    const docs=[...S.caja.entries()].map(([id,c])=>({id,...c,moneda:c.moneda||'MXN',cajaId:c.cajaId||MATRIZ}))
+      .filter(c=>!hasta||(c.fecha||'')<=hasta).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.creado||0)-(b.creado||0));
+    const st={}, tot=Object.fromEntries(MONEDAS.map(m=>[m,0]));
+    const get = k => st[k] ||= {bal:Object.fromEntries(MONEDAS.map(m=>[m,0])), inv:Object.fromEntries(MONEDAS.map(m=>[m,{q:0,cost:0}]))};
+    const avgOf = (k,cur) => { const i=get(k).inv[cur]; return i.q>0? i.cost/i.q : null; };
+    const addInv = (k,cur,q,tc) => { if (cur==='MXN') return; const t=tc||avgOf(k,cur)||0; const i=get(k).inv[cur]; i.q+=q; i.cost+=q*t; };
+    const outInv = (k,cur,q) => { if (cur==='MXN') return q; const a=avgOf(k,cur)||0; const i=get(k).inv[cur]; i.q-=q; i.cost-=q*a; if (i.q<=1e-9){ i.q=Math.max(0,i.q); if(!i.q) i.cost=0; } return q*a; };
+    for (const c of docs){
+      const k=c.cajaId, cur=c.moneda; c.efBy={}; c.util=null; c.eqMx=0;
+      const apply=(kk,m,v)=>{ get(kk).bal[m]+=v; tot[m]+=v; const e=(c.efBy[kk] ||= {}); e[m]=(e[m]||0)+v; };
+      if (c.tipo==='cambio'){
+        const q=c.monto||0, mx=c.mxn||0;
+        if (c.operacion==='compra'){ apply(k,cur,q); apply(k,'MXN',-mx); addInv(k,cur,q,c.tc); }
+        else { apply(k,cur,-q); apply(k,'MXN',mx); const costo=outInv(k,cur,q); c.util=r2(mx-costo); }
+      } else if (c.tipo==='traspaso'){
+        const q=c.monto||0, d=c.destino||MATRIZ, a=avgOf(k,cur);
+        apply(k,cur,-q); apply(d,cur,q); outInv(k,cur,q); addInv(d,cur,q,a||c.tc);
+      } else {
+        const ef = SIGNED[c.tipo]? (c.monto||0) : (CT[c.tipo]? CT[c.tipo][2]*(c.monto||0) : 0);
+        c.eqMx = cur==='MXN'? Math.abs(ef) : Math.abs(ef)*(c.tc || avgOf(k,cur) || 0);
+        apply(k,cur,ef);
+        if (ef>0) addInv(k,cur,ef,c.tc); else if (ef<0) outInv(k,cur,-ef);
+      }
+      c.runBy={}; for (const [kk,e] of Object.entries(c.efBy)){ c.runBy[kk]={}; for (const m of Object.keys(e)) c.runBy[kk][m]=r2(get(kk).bal[m]); }
+      c.runAll={}; for (const e of Object.values(c.efBy)) for (const m of Object.keys(e)) c.runAll[m]=r2(tot[m]);
+    }
+    return {docs, st, get, avgOf, tot};
+  }
+  // Totales para una caja o para todas (consolidado).
+  function scopeStats(calc, scope, s){
+    const keys = scope? [scope] : (esAdmin()? cajasList().map(c=>c.id).concat(Object.keys(calc.st)).filter((v,i,a)=>a.indexOf(v)===i) : allowedCajas());
+    const bal=Object.fromEntries(MONEDAS.map(m=>[m,0])), inv=Object.fromEntries(MONEDAS.map(m=>[m,{q:0,cost:0}]));
+    for (const k of keys){ const g=calc.st[k]; if (!g) continue; for (const m of MONEDAS){ bal[m]+=g.bal[m]; inv[m].q+=g.inv[m].q; inv[m].cost+=g.inv[m].cost; } }
+    const avg = m => inv[m].q>0? inv[m].cost/inv[m].q : null;
+    const mes=mesActual(); let ent=0, sal=0, gas=0, ucam=0, ucamMes=0, nV=0, uIng=0; const cats={};
+    for (const c of calc.docs){
+      if (c.tipo==='utilidad') uIng+=c.monto||0;
+      if (scope && c.cajaId!==scope) continue;
+      if (c.tipo==='cambio' && c.operacion==='venta'){ ucam+=c.util||0; if ((c.fecha||'').slice(0,7)===mes){ ucamMes+=c.util||0; nV++; } }
+      if ((c.fecha||'').slice(0,7)!==mes) continue;
+      if (c.tipo==='entrada'||c.tipo==='utilidad') ent+=c.eqMx;
+      if (c.tipo==='salida') sal+=c.eqMx;
+      if (c.tipo==='gasto'){ gas+=c.eqMx; const kk=c.categoria||'Sin categoría'; cats[kk]=(cats[kk]||0)+c.eqMx; }
+    }
+    const valor = MONEDAS.reduce((a,m)=> a + (m==='MXN'? bal.MXN : inv[m].cost), 0);
+    return {bal, inv, avg, ent, sal, gas, cats, ucam, ucamMes, nV, valor, upi:(s.util||0)-uIng, neta:(scope? 0 : (s.utilMes||0))+ucamMes-gas};
+  }
+  const cScope = () => $('#c-scope').value || '';
+
+  function syncCaja(){
+    const t=cTipo(), esCam=t==='cambio', esTra=t==='traspaso';
+    const opts = esCam? MONEDAS.filter(m=>m!=='MXN') : (t==='utilidad'? ['MXN'] : MONEDAS);
+    const prev=$('#c-mon').value;
+    $('#c-mon').replaceChildren(...opts.map(m=>h('option',{value:m},m+' · '+NOMBRE_MON[m])));
+    $('#c-mon').value = opts.includes(prev)? prev : opts[0];
+    const cur=$('#c-mon').value, k=$('#c-caja').value||MATRIZ, conCp=(t==='entrada'||t==='salida') && cur==='MXN';
+    $('#c-help').textContent=cHelp[t];
+    $('#c-caja-l').textContent = esTra? 'Caja origen' : 'Caja';
+    $('#c-dest-w').hidden=!esTra; $('#c-op-w').hidden=!esCam;
+    $('#c-tc-w').hidden = !(esCam || (cur!=='MXN' && (t==='entrada'||t==='inicial')));
+    $('#c-tc-l').textContent = esCam? 'Tipo de cambio pactado' : 'Tipo de cambio de costo (opcional)';
+    $('#c-monto-l').textContent = esCam? 'Cantidad de '+cur : 'Monto en '+cur;
+    $('#c-cp-w').hidden=!conCp; $('#c-cat-w').hidden=t!=='gasto';
+    const cp=$('#c-cp').value;
+    $('#c-cli-w').hidden=!(conCp&&cp==='cliente'); $('#c-prov-w').hidden=!(conCp&&cp==='proveedor');
+    // fecha de operación según corte
+    const fo=fechaOperacion(k);
+    if (!$('#c-fecha').value || $('#c-fecha').dataset.auto==='1'){ $('#c-fecha').value=fo; $('#c-fecha').dataset.auto='1'; }
+    const lc=lastCorte(k), mins=new Date().getHours()*60+new Date().getMinutes();
+    $('#c-fecha-h').textContent = isClosed(k,$('#c-fecha').value)? ('Esa fecha ya tiene corte en '+cajaName(k)+'.') : (mins>=CORTE_MIN && $('#c-fecha').value>today()? 'Pasó el corte de las 4:30: se registra para mañana.' : (lc? 'Último corte: '+fechaLarga(lc) : ''));
+    $('#c-fecha-h').className = 'hint'+(isClosed(k,$('#c-fecha').value)?' changed':'');
+    const calc=cajaCalc(), g=calc.get(k), a=calc.avgOf(k,cur);
+    $('#c-monto-h').textContent = t==='utilidad'? 'Disponible por ingresar: '+fm(scopeStats(calc,'',saldos()).upi)
+      : t==='inicial'? 'Puede ser negativo.' : 'En '+cajaName(k)+': '+fmc(g.bal[cur],cur);
+    $('#c-tc-h').textContent = cur!=='MXN' && a? 'Costo promedio en '+cajaName(k)+': '+ftc(a) : '';
+    previewCaja(calc);
+  }
+  function previewCaja(calc){
+    calc = calc || cajaCalc();
+    const t=cTipo(), cur=$('#c-mon').value, k=$('#c-caja').value||MATRIZ, m=num($('#c-monto').value), tc=num($('#c-tc').value), box=$('#c-prev');
+    if (!isFinite(m)||!m){ box.replaceChildren(h('div',{},h('span',{class:'mut'},'Escribe un monto para ver el efecto.'))); return; }
+    const g=calc.get(k), nm=cajaName(k);
+    const line=(l,v,cy)=>h('div',{},h('span',{},l),h('b',{class:v<0?'neg':v>0?'pos':''},(v>0?'+':'')+fmc(v,cy)));
+    const warn=txt=>h('div',{},h('span',{class:'hint changed'},txt));
+    const rows=[];
+    if (t==='cambio'){
+      const op=$('#c-op').value, q=Math.abs(m);
+      if (!isFinite(tc)||tc<=0){ box.replaceChildren(h('div',{},h('span',{class:'mut'},'Escribe el tipo de cambio.'))); return; }
+      const mx=r2(q*tc);
+      rows.push(line(nm+' · '+cur, op==='compra'? q : -q, cur), line(nm+' · MXN', op==='compra'? -mx : mx, 'MXN'));
+      if (op==='venta'){ const a=calc.avgOf(k,cur); if (a) rows.push(line('Utilidad cambiaria (costo '+ftc(a)+')', r2(mx-q*a), 'MXN')); }
+      if (op==='venta' && q>g.bal[cur]+1e-9) rows.push(warn('Solo hay '+fmc(g.bal[cur],cur)+' en '+nm+'.'));
+      if (op==='compra' && mx>g.bal.MXN+1e-9) rows.push(warn('Ojo: '+nm+' solo tiene '+fmc(g.bal.MXN)+' en pesos.'));
+    } else if (t==='traspaso'){
+      const d=$('#c-dest').value, q=Math.abs(m);
+      rows.push(line(nm+' · '+cur, -q, cur));
+      if (d) rows.push(line(cajaName(d)+' · '+cur, q, cur));
+      if (q>g.bal[cur]+1e-9) rows.push(warn('Solo hay '+fmc(g.bal[cur],cur)+' en '+nm+'.'));
+    } else {
+      const ef = SIGNED[t]? m : CT[t][2]*Math.abs(m);
+      rows.push(line(nm+' · '+cur, ef, cur), h('div',{},h('span',{class:'mut'},'Saldo '+cur+' después'),h('b',{},fmc(g.bal[cur]+ef,cur))));
+      const cp=$('#c-cp').value;
+      if (cur==='MXN' && (t==='entrada'||t==='salida') && cp==='cliente' && $('#c-cli').value) rows.push(line('Saldo de '+nameOf(S.cli,$('#c-cli').value), t==='entrada'? Math.abs(m) : -Math.abs(m)));
+      if (cur==='MXN' && (t==='entrada'||t==='salida') && cp==='proveedor' && $('#c-prov').value) rows.push(line('Saldo de '+nameOf(S.prov,$('#c-prov').value), t==='salida'? Math.abs(m) : -Math.abs(m)));
+    }
+    box.replaceChildren(...rows);
+  }
+  function pendienteCorte(k, calc){
+    const lc=lastCorte(k), fo=fechaOperacion(k);
+    return calc.docs.some(c=>(c.cajaId===k || c.destino===k) && (!lc || c.fecha>lc) && c.fecha<fo);
+  }
+  function renderCaja(s){
+    const allowed=allowedCajas(), cajasAll=cajasList(), cajas=cajasAll.filter(c=>allowed.includes(c.id));
+    if (cScope() && !allowed.includes(cScope())) $('#c-scope').value='';
+    const calc=cajaCalc();
+    // selects de caja
+    const keepOpts=(sel,items,first)=>{ const v=sel.value; sel.replaceChildren(...(first!=null?[h('option',{value:''},first)]:[]),...items.map(i=>h('option',{value:i.id},i.nombre))); if([...sel.options].some(o=>o.value===v)) sel.value=v; else if (first==null && items[0]) sel.value=items[0].id; };
+    keepOpts($('#c-scope'),cajas, S.rol==='admin'? 'Todas las cajas (consolidado)' : S.rol==='supervisor'? 'Todas las sucursales' : null);
+    keepOpts($('#c-caja'),cajas,null);
+    const scope=cScope(), st=scopeStats(calc,scope,s);
+    if (scope) $('#c-caja').value=scope;
+    const prevDest=$('#c-dest').value;
+    keepOpts($('#c-dest'),cajasAll.filter(c=>c.id!==($('#c-caja').value||MATRIZ)),null);
+    if (!prevDest && $('#c-caja').value!==MATRIZ) $('#c-dest').value=MATRIZ;
+    $('#c-scope-h').textContent = scope? (lastCorte(scope)? 'Último corte: '+fechaLarga(lastCorte(scope)) : 'Sin cortes todavía') : cajas.length+' cajas · las cifras suman todas';
+    $('#btn-corte').hidden = !S.canWrite || !cajas.length;
+    $('#form-caja').hidden = !cajas.length;
+    // inventario por moneda
+    $('#c-inv').replaceChildren(...MONEDAS.map(m=>{
+      const a=st.avg(m), q=st.bal[m];
+      return h('div',{class:'kpi'},h('span',{class:'eyebrow'},m+' · '+NOMBRE_MON[m]),
+        h('span',{class:'v'+(q<0?' neg':'')},fmc(q,m)),
+        h('span',{class:'s'}, m==='MXN'? (scope? 'Efectivo en pesos' : 'Valor total de cajas '+fm(st.valor)) : (q? ('Costo prom. '+ftc(a)+' · '+fm(st.inv[m].cost)) : 'Sin existencia')));
+    }));
+    $('#c-ent').textContent=fm(st.ent); $('#c-sal').textContent=fm(st.sal); $('#c-gas').textContent=fm(st.gas);
+    $('#c-ucam').textContent=fm(st.ucamMes); $('#c-ucam').className='v'+(st.ucamMes<0?' neg':'');
+    $('#c-ucam-s').textContent = st.nV? (st.nV+' ventas · acumulada '+fm(st.ucam)) : 'Ventas contra costo promedio';
+    $('#c-neta').textContent=fm(st.neta); $('#c-neta').className='v'+(st.neta<0?' neg':'');
+    $('#c-neta-s').textContent = scope? 'Cambiaria − gastos de esta caja' : 'Comisiones + cambiaria − gastos';
+    $('#c-upi').textContent=fm(st.upi);
+    // resumen en el dashboard (consolidado)
+    const all=scopeStats(calc,'',s); // solo se muestra al administrador
+    const otras = MONEDAS.filter(m=>m!=='MXN' && Math.abs(all.bal[m])>0.004).map(m=>fmc(all.bal[m],m));
+    const pend = cajas.filter(c=>pendienteCorte(c.id,calc));
+    $('#k-caja').textContent=fm(all.bal.MXN);
+    $('#k-caja-s').textContent = (otras.length? otras.join(' · ')+' · ' : '') + 'Valor total '+fm(all.valor) + (pend.length? ' · '+pend.length+' con corte pendiente' : '');
+    // tabla de cajas
+    $('#t-cajas').replaceChildren(...cajas.map(c=>{
+      const g=calc.st[c.id], lc=lastCorte(c.id), p=pendienteCorte(c.id,calc), vacia=!calc.docs.some(d=>d.cajaId===c.id||d.destino===c.id);
+      return h('tr',{class:'click'+(scope===c.id?' sel':''),...rowKey(()=>{ $('#c-scope').value=c.id; $('#c-caja').value=c.id; $('#c-fecha').dataset.auto='1'; render(); syncCaja(); })},
+        h('td',{},sp(c.id===MATRIZ? 'Matriz' : c.nombre, h('span',{class:'pill '+(c.id===MATRIZ?'int':'ext')}, c.id===MATRIZ?'Matriz':'Sucursal'))),
+        ...MONEDAS.map(m=>{ const v=g? g.bal[m] : 0; return h('td',{class:'n '+(v<0?'neg':v?'':'mut')}, v? fmc(v,m) : '—'); }),
+        h('td',{class:'d'}, lc? fechaLarga(lc) : '—'),
+        h('td',{}, p? h('span',{class:'pill pend'},'Corte pendiente') : h('span',{class:'pill asig'},'Al día')),
+        h('td',{class:'acts'}, esAdmin() && S.canWrite && c.id!==MATRIZ && vacia && !cortesDe(c.id).length? armBtn('Quitar','¿Quitar?',()=>quitarSucursal(c.id)) : null));
+    }));
+    // categorías
+    const cats=Object.entries(st.cats).sort((a,b)=>b[1]-a[1]), max=cats.length?cats[0][1]:1;
+    $('#c-bars').replaceChildren(...(cats.length? cats.map(([k,v])=>h('div',{class:'bar-r'},h('span',{},k),h('div',{class:'bar-t'},h('i',{style:'width:'+Math.max(2,v/max*100).toFixed(1)+'%'})),h('b',{},fm(v))))
+      : [h('div',{class:'empty',style:'padding:16px'},'Sin gastos registrados este mes.')]));
+    const usadas=[...new Set([...CAT_BASE, ...[...S.caja.values()].map(c=>c.categoria).filter(Boolean)])];
+    $('#dl-cat').replaceChildren(...usadas.map(c=>h('option',{value:c})));
+    const keep=(sel,items,first)=>{ const v=sel.value; sel.replaceChildren(h('option',{value:''},first),...items.map(i=>h('option',{value:i.id},i.nombre))); if([...sel.options].some(o=>o.value===v)) sel.value=v; };
+    keep($('#c-cli'),byName(S.cli),'— Elige cliente —'); keep($('#c-prov'),byName(S.prov),'— Elige proveedor —');
+    keep($('#cf-mon'),MONEDAS.map(m=>({id:m,nombre:m})),'Todas las monedas');
+    // movimientos
+    const fmn=$('#cf-mes').value, ft=$('#cf-tipo').value, fmo=$('#cf-mon').value;
+    const list=calc.docs.filter(c=>(scope? c.efBy[scope] : Object.keys(c.efBy).some(k=>allowed.includes(k)))&&(!ft||tipoKey(c)===ft)&&(!fmn||(c.fecha||'').startsWith(fmn))
+      &&(!fmo||Object.values(c.efBy).some(e=>e[fmo]!=null))).reverse();
+    const efView = c => { if (scope) return c.efBy[scope]||{}; const o={}; for (const e of Object.values(c.efBy)) for (const [m,v] of Object.entries(e)) o[m]=(o[m]||0)+v; return o; };
+    const amt = (ef,sign) => Object.entries(ef).filter(([,v])=>sign>0? v>1e-9 : v<-1e-9).map(([k,v])=>fmc(Math.abs(v),k)).join(' / ');
+    $('#t-caja').replaceChildren(...(list.length? list.slice(0,500).map(c=>{
+      const k=tipoKey(c), ef=efView(c), cp = c.clienteId? nameOf(S.cli,c.clienteId) : c.proveedorId? nameOf(S.prov,c.proveedorId) : '';
+      const runCur = fmo || c.moneda, run = scope? (c.runBy[scope]||{})[runCur] : (esAdmin()? c.runAll[runCur] : null);
+      const lock = isClosed(c.cajaId,c.fecha) || (c.tipo==='traspaso' && isClosed(c.destino||MATRIZ,c.fecha));
+      const cajaTxt = c.tipo==='traspaso'? cajaName(c.cajaId)+' → '+cajaName(c.destino||MATRIZ) : cajaName(c.cajaId);
+      return h('tr',{},
+        h('td',{class:'d'},c.fecha), h('td',{class:'nw'},cajaTxt),
+        h('td',{},sp(h('span',{class:'pill '+(CT[k]||[])[1]},(CT[k]||[k])[0]), c.moneda!=='MXN'? h('span',{class:'pill mod'},c.moneda) : null)),
+        h('td',{class:'desc'},sp(c.concepto||'', c.categoria? h('span',{class:'pill'},c.categoria):null, c.referencia? h('span',{class:'hint'},c.referencia):null,
+          !scope && c.tipo==='traspaso'? h('span',{class:'hint'},fmc(c.monto,c.moneda)) : null)),
+        h('td',{class:cp?'':'mut'},cp||'—'),
+        h('td',{class:'n pos'},amt(ef,1)), h('td',{class:'n neg'},amt(ef,-1)),
+        h('td',{class:'n mut'}, c.tc? ftc(c.tc) : ''),
+        c.util!=null? h('td',{class:'n '+(c.util<0?'neg':'pos')},fm(c.util)) : h('td',{}),
+        h('td',{class:'n'+(run<0?' neg':'')}, run!=null? fmc(run,runCur) : ''),
+        h('td',{class:'acts'}, !S.canWrite? null : lock? h('span',{class:'pill',title:'El día ya tiene corte'},'Cerrado') : armBtn('Borrar','¿Seguro?',()=>borrarCaja(c.id))));
+    }) : [emptyRow(11, S.caja.size? 'No hay movimientos con estos filtros.' : 'Las cajas están vacías. Empieza registrando el saldo inicial de cada moneda.')]));
+    // cortes
+    const cortes=[...S.cortes.entries()].map(([id,c])=>({id,...c})).filter(c=>scope? c.cajaId===scope : allowed.includes(c.cajaId)).sort((a,b)=>b.fecha.localeCompare(a.fecha)||a.cajaId.localeCompare(b.cajaId));
+    $('#t-cortes').replaceChildren(...(cortes.length? cortes.slice(0,200).map(c=>{
+      const difs=Object.entries(c.diferencia||{}).filter(([,v])=>Math.abs(v)>0.004), env=Object.entries(c.enviado||{}).filter(([,v])=>v>0);
+      const esUltimo = lastCorte(c.cajaId)===c.fecha;
+      return h('tr',{},
+        h('td',{class:'d'},c.fecha), h('td',{},cajaName(c.cajaId)),
+        h('td',{}, difs.length? sp(...difs.map(([m,v])=>h('span',{class:'pill '+(v<0?'noid':'asig')},(v<0?'Faltante ':'Sobrante ')+fmc(Math.abs(v),m)))) : h('span',{class:'pill asig'},'Cuadró')),
+        h('td',{class:env.length?'':'mut'}, env.length? env.map(([m,v])=>fmc(v,m)).join(' · ') : '—'),
+        h('td',{class:'mut'}, c.nota||''),
+        h('td',{class:'acts'}, S.canWrite && esUltimo && (S.rol==='admin'||S.rol==='supervisor')? armBtn('Reabrir día','¿Reabrir?',()=>reabrir(c.id),'') : null));
+    }) : [emptyRow(6,'Aún no hay cortes.')]));
+  }
+  async function borrarCaja(id){
+    const c=S.caja.get(id);
+    try{ if (c && c.movId && S.mov.has(c.movId)) await store.del('movimientos', c.movId); await store.del('caja', id); toast('Movimiento de caja borrado'); }
+    catch(e){ toast(writeErr(e)); }
+  }
+  async function quitarSucursal(id){ try{ await store.del('cajas', id); if (cScope()===id) $('#c-scope').value=''; toast('Sucursal quitada'); }catch(e){ toast(writeErr(e)); } }
+  async function reabrir(id){ try{ await store.del('cortes', id); toast('Día reabierto. Ya puedes corregir y volver a hacer el corte.'); }catch(e){ toast(writeErr(e)); } }
+  $('#form-suc').addEventListener('submit', async e=>{
+    e.preventDefault(); const n=$('#suc-nombre').value.trim().replace(/\s+/g,' ');
+    if (!n) return toast('Escribe el nombre de la sucursal.');
+    if (cajasList().some(c=>norm(c.nombre)===norm(n))) return toast('Ya existe una caja con ese nombre.');
+    try{ await store.add('cajas',{nombre:n, creado:Date.now()}); $('#suc-nombre').value=''; toast('Sucursal agregada'); }catch(ex){ toast(writeErr(ex)); }
+  });
+  document.querySelectorAll('input[name="ctipo"]').forEach(r=>r.addEventListener('change',syncCaja));
+  ['#c-cp','#c-cli','#c-prov','#c-mon','#c-op','#c-dest'].forEach(x=>$(x).addEventListener('change',syncCaja));
+  $('#c-caja').addEventListener('change',()=>{ $('#c-fecha').dataset.auto='1'; render(); syncCaja(); });
+  $('#c-fecha').addEventListener('change',()=>{ $('#c-fecha').dataset.auto='0'; syncCaja(); });
+  $('#c-scope').addEventListener('change',()=>{ const v=cScope(); if (v){ $('#c-caja').value=v; $('#c-fecha').dataset.auto='1'; } render(); syncCaja(); });
+  ['#c-monto','#c-tc'].forEach(x=>$(x).addEventListener('input',()=>previewCaja()));
+  ['#cf-tipo','#cf-mes','#cf-mon'].forEach(x=>$(x).addEventListener('change',()=>renderCaja(saldos())));
+  $('#k-caja-w').addEventListener('click',()=>go('caja'));
+  $('#k-caja-w').addEventListener('keydown',e=>{ if(e.key==='Enter') go('caja'); });
+  let cSaving=false;
+  $('#form-caja').addEventListener('submit', async e=>{
+    e.preventDefault(); if (cSaving) return;
+    const t=cTipo(), err=$('#c-err'), fecha=$('#c-fecha').value, cur=$('#c-mon').value, k=$('#c-caja').value||MATRIZ; const m=num($('#c-monto').value), tc=num($('#c-tc').value);
+    err.textContent='';
+    if (!fecha) return err.textContent='Falta la fecha.';
+    if (!allowedCajas().includes(k)) return err.textContent='No tienes acceso a esa caja.';
+    if (isClosed(k,fecha)) return err.textContent=cajaName(k)+' ya tiene corte el '+fechaLarga(lastCorte(k))+'. Usa una fecha posterior o reabre el día.';
+    if (!isFinite(m)||!m) return err.textContent='Escribe un monto válido.';
+    if (!SIGNED[t] && m<0) return err.textContent='Escribe el monto en positivo; el tipo ya indica si entra o sale.';
+    const base = { fecha, cajaId:k, moneda:cur, concepto:$('#c-concepto').value.trim(), referencia:$('#c-ref').value.trim(), creado:Date.now() };
+    const calc=cajaCalc(), g=calc.get(k);
+    let doc;
+    if (t==='cambio'){
+      if (!isFinite(tc)||tc<=0) return err.textContent='Escribe el tipo de cambio.';
+      const op=$('#c-op').value;
+      if (op==='venta' && m>g.bal[cur]+1e-9) return err.textContent='No alcanza: solo hay '+fmc(g.bal[cur],cur)+' en '+cajaName(k)+'.';
+      doc={ ...base, tipo:'cambio', operacion:op, monto:r2(m), tc, mxn:r2(m*tc) };
+    } else if (t==='traspaso'){
+      const d=$('#c-dest').value;
+      if (!d || d===k) return err.textContent='Elige una caja destino distinta.';
+      if (isClosed(d,fecha)) return err.textContent=cajaName(d)+' ya tiene corte en esa fecha.';
+      if (m>g.bal[cur]+1e-9) return err.textContent='No alcanza: solo hay '+fmc(g.bal[cur],cur)+' en '+cajaName(k)+'.';
+      doc={ ...base, tipo:'traspaso', destino:d, monto:r2(m) };
+    } else {
+      const conCp = (t==='entrada'||t==='salida') && cur==='MXN';
+      const cp = conCp? $('#c-cp').value : '';
+      const cliId = cp==='cliente'? $('#c-cli').value : '', provId = cp==='proveedor'? $('#c-prov').value : '';
+      if (cp==='cliente' && !cliId) return err.textContent='Elige el cliente.';
+      if (cp==='proveedor' && !provId) return err.textContent='Elige el proveedor.';
+      const cat=$('#c-cat').value.trim();
+      if (t==='gasto' && !cat) return err.textContent='Indica la categoría del gasto.';
+      doc={ ...base, tipo:t, monto:r2(m), categoria: t==='gasto'? cat : '', clienteId:cliId, proveedorId:provId, movId:'' };
+      if (cur!=='MXN' && isFinite(tc) && tc>0 && (t==='entrada'||t==='inicial')) doc.tc=tc;
+    }
+    cSaving=true; $('#c-save').disabled=true;
+    try{
+      const cid = await store.add('caja', doc);
+      if (doc.clienteId || doc.proveedorId){
+        const a=Math.abs(m);
+        const efC = doc.clienteId? (t==='entrada'? a : -a) : 0, efP = doc.proveedorId? (t==='salida'? a : -a) : 0;
+        const mid = await store.add('movimientos',{ tipo:'caja', fecha, monto:r2(a), clienteId:doc.clienteId, proveedorId:doc.proveedorId, efCliente:r2(efC), efProveedor:r2(efP), utilidad:0,
+          referencia:doc.referencia, concepto:(t==='entrada'?'Entrada a ':'Salida de ')+cajaName(k)+(doc.concepto?' · '+doc.concepto:''), cajaId:cid, creado:Date.now() });
+        await store.upd('caja', cid, {movId:mid});
+      }
+      ['#c-monto','#c-concepto','#c-ref','#c-cat'].forEach(x=>$(x).value='');
+      if (t!=='cambio') $('#c-tc').value='';
+      syncCaja(); toast(t==='cambio'? ($('#c-op').value==='compra'?'Compra registrada':'Venta registrada') : t==='traspaso'? 'Traspaso registrado' : 'Registrado en caja');
+    }catch(ex){ err.textContent=writeErr(ex); }
+    finally{ cSaving=false; $('#c-save').disabled=false; }
+  });
+
+  // ---------- Corte diario ----------
+  function openCorte(){
+    const allowed=allowedCajas(), cajas=cajasList().filter(c=>allowed.includes(c.id)), k = cScope() || $('#c-caja').value || allowed[0];
+    $('#k-caja').replaceChildren(...cajas.map(c=>h('option',{value:c.id},c.nombre))); $('#k-caja').value=k;
+    $('#k-nota').value=''; $('#k-err').textContent='';
+    corteFecha(); $('#dlg-corte').showModal();
+  }
+  function corteFecha(){
+    $('#k-fecha').value = today();
+    corteRows();
+  }
+  function corteRows(){
+    const k=$('#k-caja').value, f=$('#k-fecha').value, esSuc=k!==MATRIZ, lc=lastCorte(k);
+    $('#k-fecha-h').textContent = lc? 'Último corte: '+fechaLarga(lc) : 'Primer corte de esta caja';
+    $('#k-env-th').hidden=!esSuc;
+    const g=cajaCalc(f).get(k);
+    $('#k-rows').replaceChildren(...MONEDAS.map(m=>{
+      const esp=r2(g.bal[m]);
+      const inp=h('input',{class:'num',type:'text',inputmode:'decimal',id:'k-c-'+m,value:String(esp),style:'width:140px;padding:4px 8px','aria-label':'Contado '+m});
+      const env=h('input',{class:'num',type:'text',inputmode:'decimal',id:'k-e-'+m,placeholder:'0.00',style:'width:140px;padding:4px 8px','aria-label':'Enviar a matriz '+m});
+      const dif=h('td',{class:'n mut',id:'k-d-'+m},'—');
+      const upd=()=>{ const c=num(inp.value), d=isFinite(c)? r2(c-esp) : NaN; dif.textContent = !isFinite(d)? '—' : Math.abs(d)<0.005? 'Cuadra' : (d>0?'+':'')+fmc(d,m); dif.className='n '+(!isFinite(d)||Math.abs(d)<0.005?'mut':d<0?'neg':'pos'); };
+      inp.addEventListener('input',upd); upd();
+      return h('tr',{},h('td',{},m+' · '+NOMBRE_MON[m]),h('td',{class:'n'},fmc(esp,m)),h('td',{class:'n'},inp),dif, esSuc? h('td',{class:'n'},env) : null);
+    }));
+  }
+  $('#btn-corte').addEventListener('click',openCorte);
+  $('#k-caja').addEventListener('change',corteFecha);
+  $('#k-fecha').addEventListener('change',corteRows);
+  let kSaving=false;
+  $('#form-corte').addEventListener('submit', async e=>{
+    e.preventDefault(); if (kSaving) return;
+    const k=$('#k-caja').value, f=$('#k-fecha').value, err=$('#k-err'), esSuc=k!==MATRIZ;
+    err.textContent='';
+    if (!f) return err.textContent='Falta la fecha del corte.';
+    if (!allowedCajas().includes(k)) return err.textContent='No tienes acceso a esa caja.';
+    if (isClosed(k,f)) return err.textContent='Esa fecha ya está cerrada en '+cajaName(k)+'.';
+    if (f>today()) return err.textContent='No se puede hacer el corte de un día que no ha llegado.';
+    const g=cajaCalc(f).get(k), esperado={}, contado={}, diferencia={}, enviado={};
+    for (const m of MONEDAS){
+      const c=num($('#k-c-'+m).value); if (!isFinite(c)) return err.textContent='Escribe lo contado en '+m+'.';
+      const en = esSuc? num($('#k-e-'+m).value||'0') : 0; if (!isFinite(en)||en<0) return err.textContent='El envío a matriz en '+m+' no es válido.';
+      if (en>c+1e-9) return err.textContent='No puedes enviar más '+m+' de lo contado.';
+      esperado[m]=r2(g.bal[m]); contado[m]=r2(c); diferencia[m]=r2(c-g.bal[m]); enviado[m]=r2(en);
+    }
+    if (esSuc && Object.values(enviado).some(v=>v>0) && isClosed(MATRIZ,f)) return err.textContent='La matriz ya tiene corte ese día; no puede recibir el envío.';
+    kSaving=true; $('#k-save').disabled=true;
+    try{
+      const now=Date.now();
+      for (const m of MONEDAS) if (Math.abs(diferencia[m])>=0.005)
+        await store.add('caja',{ tipo:'ajuste', fecha:f, cajaId:k, moneda:m, monto:diferencia[m], concepto: diferencia[m]>0? 'Sobrante en corte' : 'Faltante en corte', referencia:'', creado:now });
+      for (const m of MONEDAS) if (enviado[m]>0)
+        await store.add('caja',{ tipo:'traspaso', fecha:f, cajaId:k, destino:MATRIZ, moneda:m, monto:enviado[m], concepto:'Envío a matriz en corte', referencia:'', creado:now+1 });
+      await store.set('cortes', k+'_'+f, { cajaId:k, fecha:f, esperado, contado, diferencia, enviado, nota:$('#k-nota').value.trim(), creado:now+2 });
+      $('#dlg-corte').close(); toast('Corte de '+cajaName(k)+' del '+fechaLarga(f)+' guardado');
+      $('#c-fecha').dataset.auto='1'; syncCaja();
+    }catch(ex){ err.textContent=writeErr(ex); }
+    finally{ kSaving=false; $('#k-save').disabled=false; }
+  });
+  $('#c-fecha').dataset.auto='1'; syncCaja();
+  setInterval(()=>{ if (!document.hidden) { render(); if ($('#c-fecha').dataset.auto==='1') syncCaja(); } }, 60000);
+
+  // ---------- Usuarios ----------
+  let userApi=null, uPick=null;
+  async function cargarPerfiles(){
+    if (!userApi) return;
+    const ids=[...S.roles.keys()].filter(id=>!S.prof[id]);
+    if (!ids.length) return;
+    try{ const ps=await userApi.profiles(ids); for (const id of ids) S.prof[id]=(ps[id]&&ps[id].name)||'Persona sin nombre'; renderUsr(); }catch(e){}
+  }
+  function renderUsr(){
+    const cajas=cajasList();
+    const keep=(sel,items)=>{ const v=sel.value; sel.replaceChildren(...items.map(i=>h('option',{value:i.id},i.nombre))); if([...sel.options].some(o=>o.value===v)) sel.value=v; };
+    keep($('#u-caja'),cajas);
+    $('#u-caja-w').hidden = $('#u-rol').value!=='cajero';
+    const rows=[...S.roles.entries()].map(([id,r])=>({id,...r})).sort((a,b)=>(S.prof[a.id]||'').localeCompare(S.prof[b.id]||'','es'));
+    const out = rows.map(r=>{
+      const rolSel=h('select',{'aria-label':'Rol',style:'width:auto;padding:4px 8px;font-size:14px',onchange:async e=>{ const v=e.target.value; try{ await store.set('roles',r.id,{rol:v, cajaId:v==='cajero'? (r.cajaId||MATRIZ) : '', actualizado:Date.now()}); toast('Rol actualizado'); }catch(ex){ toast(writeErr(ex)); } }},
+        ...Object.entries(ROLES).map(([k,v])=>{ const o=h('option',{value:k},v.nombre); if (k===r.rol) o.selected=true; return o; }));
+      const cajaSel = r.rol==='cajero'? h('select',{'aria-label':'Caja',style:'width:auto;padding:4px 8px;font-size:14px',onchange:async e=>{ try{ await store.set('roles',r.id,{rol:'cajero', cajaId:e.target.value, actualizado:Date.now()}); toast('Caja asignada'); }catch(ex){ toast(writeErr(ex)); } }},
+        ...cajas.map(c=>{ const o=h('option',{value:c.id},c.nombre); if (c.id===r.cajaId) o.selected=true; return o; })) : h('span',{class:'mut'},r.rol==='supervisor'?'Todas las sucursales':'—');
+      return h('tr',{}, h('td',{},sp(S.prof[r.id]||'Cargando…', r.id===S.me? h('span',{class:'pill'},'Tú') : null)), h('td',{},rolSel), h('td',{},cajaSel),
+        h('td',{class:'acts'}, armBtn('Quitar acceso','¿Quitar?',async()=>{ try{ await store.del('roles',r.id); toast('Acceso quitado'); }catch(ex){ toast(writeErr(ex)); } })));
+    });
+    out.unshift(h('tr',{},h('td',{},sp('Dueño de la página', S.owner? h('span',{class:'pill'},'Tú') : null)),h('td',{},'Administrador (siempre)'),h('td',{class:'mut'},'—'),h('td',{})));
+    $('#t-usr').replaceChildren(...out);
+    if (rows.some(r=>!S.prof[r.id])) cargarPerfiles();
+  }
+  let uT;
+  $('#u-q').addEventListener('input',()=>{
+    uPick=null; clearTimeout(uT);
+    uT=setTimeout(async()=>{
+      const box=$('#u-sugg');
+      if (!userApi || !userApi.search){ box.hidden=true; return; }
+      try{
+        const hits=(await userApi.search($('#u-q').value.trim())).slice(0,8);
+        box.replaceChildren(...(hits.length? hits.map(p=>h('button',{type:'button',onclick:()=>{ uPick={id:p.id,name:p.name}; $('#u-q').value=p.name||'Persona'; box.hidden=true; }},p.name||'Persona sin nombre', p.guest? ' (invitado)' : '')) : [h('span',{class:'hint',style:'padding:8px 10px'},'Nadie con ese nombre. Primero compártele la página.')]));
+        box.hidden=false;
+      }catch(e){ box.hidden=true; }
+    },250);
+  });
+  $('#u-q').addEventListener('focus',()=>{ if (!$('#u-q').value) $('#u-q').dispatchEvent(new Event('input')); });
+  document.addEventListener('click',e=>{ if (!e.target.closest('#form-usr')) $('#u-sugg').hidden=true; });
+  $('#u-rol').addEventListener('change',()=>{ $('#u-caja-w').hidden = $('#u-rol').value!=='cajero'; });
+  $('#form-usr').addEventListener('submit', async e=>{
+    e.preventDefault(); const err=$('#u-err'); err.textContent='';
+    if (!db) return err.textContent='Los usuarios solo se pueden asignar con la página conectada a la base de datos.';
+    if (!uPick) return err.textContent='Elige a la persona de la lista de sugerencias.';
+    const rol=$('#u-rol').value, cajaId= rol==='cajero'? $('#u-caja').value : '';
+    if (rol==='cajero' && !cajaId) return err.textContent='Elige la caja del cajero.';
+    try{ await store.set('roles', uPick.id, {rol, cajaId, actualizado:Date.now()}); S.prof[uPick.id]=uPick.name||S.prof[uPick.id]; uPick=null; $('#u-q').value=''; toast('Rol asignado'); }
+    catch(ex){ err.textContent = ex&&ex.code==='invalid_argument'? 'Para asignar roles necesitas ser Editor de la página. Pídeselo al dueño.' : writeErr(ex); }
+  });
+
+  // ---------- Borrar ejemplo ----------
+  const bej=$('#btn-borrar-ej');
+  bej.addEventListener('click', async ()=>{
+    if (!bej.classList.contains('armed')){ bej.classList.add('armed'); bej.textContent='Confirmar: borrar ejemplo'; setTimeout(()=>{bej.classList.remove('armed');bej.textContent='Borrar datos de ejemplo';},4000); return; }
+    bej.disabled=true;
+    try{
+      for (const [col,key] of [['movimientos','mov'],['clientes','cli'],['proveedores','prov']])
+        for (const [id,v] of [...S[key].entries()]) if (v.ejemplo) await store.del(col,id);
+      toast('Datos de ejemplo borrados');
+    }catch(ex){ toast(writeErr(ex)); }
+    bej.disabled=false;
+  });
+
+  // ---------- CSV ----------
+  $('#btn-csv').addEventListener('click', async ()=>{
+    const rows=[['Fecha','Tipo','Modalidad','Cliente','Atiende','Proveedor','Referencia','Concepto','Monto','% Cliente','% Proveedor','Efecto cliente','Efecto proveedor','Utilidad']];
+    for (const m of filteredMovs(sortedMovs())) rows.push([m.fecha,(TIPOS[m.tipo]||[m.tipo])[0],MOD[m.modalidad]||'',m.tipo==='noident'?'No identificados':(m.clienteId?nameOf(S.cli,m.clienteId):''),(S.cli.get(m.clienteId)||{}).atiende||'',m.proveedorId?nameOf(S.prov,m.proveedorId):'',m.referencia||'',m.concepto||'',m.monto,m.pctCliente??'',m.pctProveedor??'',m.efCliente,m.efProveedor,m.utilidad]);
+    const csv='﻿'+rows.map(r=>r.map(v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
+    const dl = window.claude ? await window.claude.use('downloads').catch(()=>null) : null;
+    if (!dl){ toast('La descarga no está disponible en esta vista.'); return; }
+    try{ await dl.save({filename:'movimientos-'+today()+'.csv', data:csv}); }
+    catch(e){ if (e && e.code!=='declined') toast('No se pudo descargar el archivo.'); }
+  });
+
+  // ---------- Arranque ----------
+  try{ const t=localStorage.getItem('bc-tab'); if (t && $('#v-'+t)) go(t); }catch(e){}
+  render();
+  (async ()=>{
+    db = window.claude ? await window.claude.use('db').catch(()=>null) : null;
+    if (!db){ $('#n-offline').hidden=false; S.rol='admin'; render(); return; }
+    const user = await window.claude.use('user').catch(()=>null);
+    userApi = user;
+    S.rol=null; S.owner = user? !!(await Promise.resolve(user.isOwner()).catch(()=>false)) : false;
+    S.me = user? await Promise.resolve(user.id()).catch(()=>null) : null;
+    const cw = user ? await Promise.resolve(user.can('data.write')).catch(()=>null) : null;
+    if (cw===false){ S.canWrite=false; $('#n-readonly').hidden=false; }
+    render();
+    let pending=null;
+    const sched=()=>{ if(!pending) pending=requestAnimationFrame(()=>{pending=null;render();}); };
+    for (const [col,key] of Object.entries(K)){
+      db.collection(col).onSnapshot(snap=>{
+        S[key]=new Map(snap.docs.map(d=>[d.id,d.data()])); if (key==='roles') S.rolesListos=true; sched();
+        if (key==='lin' && S.imp) renderImport();
+      }, e=>{ if (e && e.code!=='revoked') toast('Se perdió la conexión con los datos. Recarga la página.'); });
+    }
+  })();
+})();
+</script>
